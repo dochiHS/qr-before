@@ -111,13 +111,26 @@ export function compareLayout(mine, plan) {
 }
 
 // mine: toRects() 결과. 비슷한 면적(±16㎡) 또는 같은 방 개수인 도면 중 일치율 높은 순
-export async function matchPlans(mine, { area, rooms, limit = 3 } = {}) {
+// daejeonOnly: 대전 단지 도면만. 대전 도면은 같은 단지의 실거래가(trade)를 붙여 돌려준다.
+export async function matchPlans(mine, { area, rooms, limit = 3, daejeonOnly = false } = {}) {
   const { items } = await load("plans.json");
-  return items
-    .filter(p => !area || Math.abs(p.area - area) <= 16 || p.rooms === rooms)
+  const ranked = items
+    .filter(p => (!daejeonOnly || p.daejeon) && (!area || Math.abs(p.area - area) <= 16 || p.rooms === rooms))
     .map(p => ({ plan: p, ...compareLayout(mine, p) }))
     .sort((x, y) => y.score - x.score)
     .slice(0, limit);
+  if (ranked.some(r => r.plan.trade)) {
+    const { items: apts } = await load("apartments-daejeon.json");
+    for (const r of ranked) {
+      const t = r.plan.trade;
+      if (!t) continue;
+      const hit = apts.filter(a => a.gu === t.gu && a.apt === t.apt && Math.abs(a.area - r.plan.area) <= 3)
+        .sort((a, b) => Math.abs(a.area - r.plan.area) - Math.abs(b.area - r.plan.area))[0];
+      if (hit) r.trade = { apt: hit.apt, gu: hit.gu, dong: hit.dong, area: hit.area, built: hit.built,
+        sale: hit.sale, lastSale: hit.lastSale, saleDate: hit.lastDate, jeonse: hit.jeonse, saleCount: hit.saleCount };
+    }
+  }
+  return ranked;
 }
 
 // ───── 4. 견적: 월급 몇 년 ─────
