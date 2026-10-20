@@ -3,7 +3,18 @@
 
   var engine = null;
   var lastAnalyzedUrl = "";
+  var analysisRequestId = 0;
+  var parkingRequestId = 0;
+  var facilityRequestId = 0;
+  var selectedFacilityId = null;
+  var listedFacilities = [];
+  var parkingVisibleCount = 0;
+  var parkingBatchSize = 10;
+  var nearbyMode = false;
   var detector = null;
+  var detectorChecked = false;
+  var qrCanvas = document.createElement("canvas");
+  var qrContext = qrCanvas.getContext("2d", { willReadFrequently: true });
   var cameraStream = null;
   var scanFrameId = null;
   var isScanning = false;
@@ -19,15 +30,21 @@
   var urlInput = document.getElementById("url-input");
   var parkingForm = document.getElementById("parking-form");
   var parkingInput = document.getElementById("parking-input");
+  var nearbyButton = document.getElementById("nearby-button");
   var parkingFeedback = document.getElementById("parking-feedback");
   var parkingStatus = document.getElementById("parking-status");
   var parkingResults = document.getElementById("parking-results");
+  var parkingMore = document.getElementById("parking-more");
   var clearFacility = document.getElementById("clear-facility");
   var resultEmpty = document.getElementById("result-empty");
+  var resultEmptyHeading = document.getElementById("result-empty-heading");
+  var resultEmptyMessage = document.getElementById("result-empty-message");
   var resultCard = document.getElementById("result-card");
   var resultLabel = document.getElementById("result-label");
   var resultHeading = document.getElementById("result-heading");
   var resultMessage = document.getElementById("result-message");
+  var operatorWarning = document.getElementById("operator-warning");
+  var operatorWarningMessage = document.getElementById("operator-warning-message");
   var resultReasons = document.getElementById("result-reasons");
   var resultDetails = document.getElementById("result-details");
   var referenceNote = document.getElementById("reference-note");
@@ -35,6 +52,10 @@
   var cameraClose = document.getElementById("camera-close");
   var cameraVideo = document.getElementById("camera-video");
   var cameraStatus = document.getElementById("camera-status");
+
+  function isOperatorMismatchReason(reason) {
+    return typeof reason === "string" && reason.indexOf("선택한 주차장의 관리기관") !== -1 && reason.indexOf("다른 기관의 도메인") !== -1;
+  }
 
   function showResult(result) {
     var rawStatus = result && result.status;
@@ -44,18 +65,22 @@
     var messages = {
       danger: "주소를 열거나 개인정보를 입력하지 말고 아래 이유를 확인해 주세요.",
       warning: "주소를 열기 전에 아래 내용을 확인해 주세요.",
-      reference: "공식 운영기관의 참고 도메인과 일치하지만 공식 결제 페이지나 안전을 보장하지 않습니다.",
+      reference: "등록된 기관의 참고 도메인과 일치해요. 결제 페이지 여부는 별도로 확인해 주세요.",
       unknown: "공식 주소인지 판단할 근거가 부족합니다. 관리기관에 직접 확인해 주세요."
     };
     var details = {};
     var detailKeys;
+    var reasons;
+    var operatorMismatchReasons;
 
     result = result || {};
+    reasons = Array.isArray(result.reasons) ? result.reasons : [];
+    operatorMismatchReasons = reasons.filter(isOperatorMismatchReason);
     Object.keys(result.details || {}).forEach(function (key) {
       details[key] = result.details[key];
     });
     if (result.checkedUrl) details["검사 주소"] = result.checkedUrl;
-    if (result.matchedDomain) details["비교된 참고 도메인"] = result.matchedDomain;
+    if (result.matchedDomain) details["참고 도메인"] = result.matchedDomain;
     if (result.facility) {
       details["선택 시설"] = result.facility.name || result.facility.id;
       details["시설 관리기관"] = result.facility.operator || "정보 없음";
@@ -69,8 +94,12 @@
     resultLabel.textContent = labels[status];
     resultHeading.textContent = result.title || titles[status];
     resultMessage.textContent = result.message || messages[status];
+    operatorWarningMessage.textContent = operatorMismatchReasons.join(" ");
+    operatorWarning.hidden = operatorMismatchReasons.length === 0;
     resultReasons.replaceChildren();
-    (Array.isArray(result.reasons) ? result.reasons : []).forEach(function (reason) {
+    reasons.filter(function (reason) {
+      return !isOperatorMismatchReason(reason);
+    }).forEach(function (reason) {
       var item = document.createElement("li");
       item.textContent = reason;
       resultReasons.append(item);
@@ -82,10 +111,22 @@
       var term = document.createElement("dt");
       var description = document.createElement("dd");
       term.textContent = key;
-      description.textContent = details[key];
+      if (key === "검사 주소" || key === "확인 대상") {
+        description.className = "breakable-url";
+        appendBreakableText(description, details[key]);
+      } else {
+        description.textContent = details[key];
+      }
       resultDetails.append(term, description);
     });
     referenceNote.hidden = !result.facility && !result.matchedDomain;
+  }
+
+  function appendBreakableText(element, value) {
+    String(value).split(/([/?&#=])/).forEach(function (part) {
+      element.append(document.createTextNode(part));
+      if (/^[/?&#=]$/.test(part)) element.append(document.createElement("wbr"));
+    });
   }
 
   function showPreviewOnly(source, value) {
@@ -106,29 +147,86 @@
   }
 
   function runEngine(method, value, fallbackSource) {
+    var requestId = analysisRequestId;
+    if (method === "analyzeUrl") {
+      lastAnalyzedUrl = value;
+      requestId = ++analysisRequestId;
+    }
     if (!engine || typeof engine[method] !== "function") {
       showPreviewOnly(fallbackSource, value);
       return Promise.resolve(null);
     }
 
-    if (method === "analyzeUrl") lastAnalyzedUrl = value;
     return Promise.resolve(engine[method](value)).then(function (result) {
+      if (method === "analyzeUrl" && requestId !== analysisRequestId) return null;
       showResult(result);
       return result;
     }).catch(function (error) {
+      if (method === "analyzeUrl" && requestId !== analysisRequestId) return null;
       handleEngineError(error);
       return null;
     });
   }
 
   function getDetector() {
+    if (detectorChecked) return detector;
+    detectorChecked = true;
     if (!("BarcodeDetector" in window)) return null;
     try {
-      if (!detector) detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      detector = new window.BarcodeDetector({ formats: ["qr_code"] });
     } catch (error) {
       return null;
     }
     return detector;
+  }
+
+  function hasJsQr() {
+    return typeof window.jsQR === "function" && Boolean(qrContext);
+  }
+
+  function decodeWithJsQr(source, width, height) {
+    var imageData;
+    var code;
+    if (!hasJsQr() || !width || !height) return "";
+    qrCanvas.width = width;
+    qrCanvas.height = height;
+    qrContext.drawImage(source, 0, 0, width, height);
+    imageData = qrContext.getImageData(0, 0, width, height);
+    code = window.jsQR(imageData.data, width, height);
+    return code && typeof code.data === "string" ? code.data : "";
+  }
+
+  function detectQr(source, width, height) {
+    var activeDetector = getDetector();
+    if (activeDetector) {
+      return activeDetector.detect(source).then(function (codes) {
+        if (codes.length && codes[0].rawValue) return codes[0].rawValue;
+        return decodeWithJsQr(source, width, height);
+      }, function (error) {
+        if (!hasJsQr()) throw error;
+        return decodeWithJsQr(source, width, height);
+      });
+    }
+    if (!hasJsQr()) return Promise.reject(new Error("QR decoder unavailable"));
+    return Promise.resolve().then(function () {
+      return decodeWithJsQr(source, width, height);
+    });
+  }
+
+  function loadImageFile(file) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      var objectUrl = URL.createObjectURL(file);
+      image.onload = function () {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+      };
+      image.onerror = function () {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Image load failed"));
+      };
+      image.src = objectUrl;
+    });
   }
 
   function getHttpUrl(value) {
@@ -200,23 +298,21 @@
   }
 
   function scanCameraFrame(time) {
-    var activeDetector;
     if (!isScanning) return;
     if (detectionBusy || cameraVideo.readyState < 2 || time - lastScanTime < 200) {
       scanFrameId = requestAnimationFrame(scanCameraFrame);
       return;
     }
 
-    activeDetector = getDetector();
     lastScanTime = time;
     detectionBusy = true;
-    activeDetector.detect(cameraVideo).then(function (codes) {
+    detectQr(cameraVideo, cameraVideo.videoWidth, cameraVideo.videoHeight).then(function (rawValue) {
       detectionBusy = false;
       if (!isScanning) return;
-      if (codes.length && codes[0].rawValue) {
-        handleDecoded(codes[0].rawValue, "카메라 QR");
+      if (rawValue) {
         stopCamera();
         cameraDialog.close();
+        handleDecoded(rawValue, "카메라 QR");
         return;
       }
       scanFrameId = requestAnimationFrame(scanCameraFrame);
@@ -235,11 +331,9 @@
   }
 
   function startCamera() {
-    var activeDetector;
     if (isScanning) return;
 
-    activeDetector = getDetector();
-    if (!activeDetector) {
+    if (!getDetector() && !hasJsQr()) {
       showRecognitionError("이 브라우저는 QR 인식을 지원하지 않아요", "최신 브라우저에서 다시 시도하거나 URL을 직접 입력해 주세요.");
       return;
     }
@@ -275,10 +369,7 @@
   }
 
   function decodeImage(file) {
-    var activeDetector = getDetector();
-    var bitmap = null;
-
-    if (!activeDetector || !("createImageBitmap" in window)) {
+    if (!getDetector() && !hasJsQr()) {
       showRecognitionError("이 브라우저는 이미지 QR 인식을 지원하지 않아요", "최신 브라우저에서 다시 시도하거나 URL을 직접 입력해 주세요.", "QR 이미지");
       return;
     }
@@ -287,19 +378,16 @@
       return;
     }
 
-    createImageBitmap(file).then(function (createdBitmap) {
-      bitmap = createdBitmap;
-      return activeDetector.detect(bitmap);
-    }).then(function (codes) {
-      if (!codes.length || !codes[0].rawValue) {
+    loadImageFile(file).then(function (image) {
+      return detectQr(image, image.naturalWidth, image.naturalHeight);
+    }).then(function (rawValue) {
+      if (!rawValue) {
         showRecognitionError("QR코드를 찾지 못했어요", "QR이 선명하게 보이는 이미지를 다시 선택해 주세요.", "QR 이미지");
         return;
       }
-      handleDecoded(codes[0].rawValue, "QR 이미지");
+      handleDecoded(rawValue, "QR 이미지");
     }).catch(function () {
       showRecognitionError("이미지를 읽을 수 없어요", "손상되지 않은 PNG 또는 JPG 이미지를 선택해 주세요.", "QR 이미지");
-    }).finally(function () {
-      if (bitmap) bitmap.close();
     });
   }
 
@@ -309,12 +397,16 @@
   }
 
   function selectFacility(facility, button) {
+    var requestId;
     if (!engine || typeof engine.selectFacility !== "function") {
       showParkingStatus("시설 선택 기능이 연결되지 않았습니다.");
       return;
     }
 
+    requestId = ++facilityRequestId;
     Promise.resolve(engine.selectFacility(facility.id)).then(function () {
+      if (requestId !== facilityRequestId) return;
+      selectedFacilityId = facility.id;
       Array.prototype.forEach.call(parkingResults.querySelectorAll("button"), function (item) {
         item.setAttribute("aria-pressed", item === button ? "true" : "false");
       });
@@ -322,39 +414,82 @@
       showParkingStatus(facility.name + "을(를) 선택했습니다.");
       if (lastAnalyzedUrl) runEngine("analyzeUrl", lastAnalyzedUrl, "시설 선택 후 URL 분석");
     }).catch(function (error) {
+      if (requestId !== facilityRequestId) return;
       showParkingStatus(error && error.message ? error.message : "시설을 선택하지 못했습니다.");
     });
   }
 
-  function showParkingResults(facilities) {
-    parkingResults.replaceChildren();
-    clearFacility.hidden = true;
-    if (!Array.isArray(facilities) || facilities.length === 0) {
-      showParkingStatus("검색 결과가 없습니다. 다른 지역명이나 시설명을 입력해 주세요.");
-      return;
-    }
+  function formatDistance(distanceKm) {
+    if (distanceKm < 1) return Math.round(distanceKm * 1000) + "m 직선거리";
+    return distanceKm.toFixed(distanceKm < 10 ? 1 : 0) + "km 직선거리";
+  }
 
-    showParkingStatus(facilities.length + "개의 주차장을 찾았습니다. 분석에 사용할 시설을 선택해 주세요.");
-    facilities.forEach(function (facility) {
+  function renderParkingResults() {
+    var visibleFacilities = listedFacilities.slice(0, parkingVisibleCount);
+    parkingResults.replaceChildren();
+    clearFacility.hidden = !selectedFacilityId;
+    visibleFacilities.forEach(function (facility) {
       var item = document.createElement("li");
       var button = document.createElement("button");
       var name = document.createElement("strong");
       var address = document.createElement("span");
       var operator = document.createElement("span");
+      var distance;
 
       button.type = "button";
       button.className = "parking-result";
-      button.setAttribute("aria-pressed", "false");
+      button.setAttribute("aria-pressed", facility.id === selectedFacilityId ? "true" : "false");
       name.textContent = facility.name || "이름 없는 주차장";
       address.textContent = facility.roadAddress || facility.jibunAddress || "주소 정보 없음";
       operator.textContent = "관리기관: " + (facility.operator || "정보 없음");
       button.append(name, address, operator);
+      if (nearbyMode && Number.isFinite(facility.distanceKm)) {
+        distance = document.createElement("span");
+        distance.className = "parking-distance";
+        distance.textContent = formatDistance(facility.distanceKm);
+        button.append(distance);
+      }
       button.addEventListener("click", function () {
         selectFacility(facility, button);
       });
       item.append(button);
       parkingResults.append(item);
     });
+    parkingMore.hidden = parkingVisibleCount >= listedFacilities.length;
+  }
+
+  function showParkingResults(facilities, isNearby) {
+    listedFacilities = Array.isArray(facilities) ? facilities : [];
+    nearbyMode = Boolean(isNearby);
+    parkingVisibleCount = nearbyMode ? parkingBatchSize : listedFacilities.length;
+    if (!Array.isArray(facilities) || facilities.length === 0) {
+      showParkingStatus("검색 결과가 없습니다. 다른 지역명이나 시설명을 입력해 주세요.");
+      parkingResults.replaceChildren();
+      parkingMore.hidden = true;
+      return;
+    }
+
+    showParkingStatus(nearbyMode
+      ? "가까운 주차장 " + Math.min(parkingVisibleCount, listedFacilities.length) + "곳입니다. 거리는 실제 경로가 아닌 직선거리입니다."
+      : listedFacilities.length + "개의 주차장을 찾았습니다. 분석에 사용할 시설을 선택해 주세요.");
+    renderParkingResults();
+  }
+
+  function locationErrorMessage(error) {
+    if (error && error.code === 1) return "위치 권한이 거부되었습니다. 기존 검색은 계속 사용할 수 있습니다.";
+    if (error && error.code === 2) return "현재 위치를 확인할 수 없습니다. GPS 상태를 확인하거나 기존 검색을 이용해 주세요.";
+    if (error && error.code === 3) return "위치 조회 시간이 초과되었습니다. 다시 시도하거나 기존 검색을 이용해 주세요.";
+    return "현재 위치를 확인하지 못했습니다. 기존 검색을 이용해 주세요.";
+  }
+
+  function resetResultForChangedUrl() {
+    if (!lastAnalyzedUrl && resultCard.hidden) return;
+    analysisRequestId += 1;
+    lastAnalyzedUrl = "";
+    resultCard.hidden = true;
+    resultEmpty.hidden = false;
+    resultEmptyHeading.textContent = "주소가 변경됐어요";
+    resultEmptyMessage.textContent = "새 주소를 확인하려면 확인 버튼을 눌러 주세요.";
   }
 
   scanButton.addEventListener("click", startCamera);
@@ -372,6 +507,8 @@
     decodeImage(file);
   });
 
+  urlInput.addEventListener("input", resetResultForChangedUrl);
+
   urlForm.addEventListener("submit", function (event) {
     var safeUrl;
     var rawValue;
@@ -387,6 +524,7 @@
   });
 
   parkingForm.addEventListener("submit", function (event) {
+    var requestId;
     event.preventDefault();
     var query = parkingInput.value.trim();
     if (!query) {
@@ -397,16 +535,77 @@
       showParkingStatus("주차장 데이터가 아직 연결되지 않았습니다.");
       return;
     }
+    requestId = ++parkingRequestId;
+    nearbyButton.disabled = false;
     showParkingStatus("주차장 데이터를 검색하고 있어요.");
     parkingResults.replaceChildren();
-    Promise.resolve(engine.searchParkingLots(query)).then(showParkingResults).catch(function (error) {
+    parkingMore.hidden = true;
+    Promise.resolve(engine.searchParkingLots(query)).then(function (facilities) {
+      if (requestId !== parkingRequestId) return;
+      showParkingResults(facilities, false);
+    }).catch(function (error) {
+      if (requestId !== parkingRequestId) return;
       showParkingStatus(error && error.message ? error.message : "주차장 데이터를 불러오지 못했습니다.");
     });
   });
 
+  nearbyButton.addEventListener("click", function () {
+    var requestId;
+    if (!navigator.geolocation) {
+      showParkingStatus("이 브라우저는 위치 기능을 지원하지 않습니다. 기존 검색을 이용해 주세요.");
+      return;
+    }
+    if (!engine || typeof engine.getNearbyParkingLots !== "function") {
+      showParkingStatus("거리 계산 기능이 아직 연결되지 않았습니다. 기존 검색을 이용해 주세요.");
+      return;
+    }
+
+    requestId = ++parkingRequestId;
+    nearbyButton.disabled = true;
+    showParkingStatus("현재 위치를 확인하고 있어요. 위치 정보는 저장하거나 전송하지 않습니다.");
+    navigator.geolocation.getCurrentPosition(function (position) {
+      var latitude = Number(position.coords.latitude);
+      var longitude = Number(position.coords.longitude);
+      if (requestId !== parkingRequestId) return;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+        || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        nearbyButton.disabled = false;
+        showParkingStatus("현재 위치 좌표가 올바르지 않습니다. 기존 검색을 이용해 주세요.");
+        return;
+      }
+      Promise.resolve(engine.getNearbyParkingLots(latitude, longitude)).then(function (facilities) {
+        if (requestId !== parkingRequestId) return;
+        nearbyButton.disabled = false;
+        showParkingResults(facilities, true);
+      }).catch(function (error) {
+        if (requestId !== parkingRequestId) return;
+        nearbyButton.disabled = false;
+        showParkingStatus(error && error.message ? error.message : "가까운 주차장을 계산하지 못했습니다.");
+      });
+    }, function (error) {
+      if (requestId !== parkingRequestId) return;
+      nearbyButton.disabled = false;
+      showParkingStatus(locationErrorMessage(error));
+    }, {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 60000
+    });
+  });
+
+  parkingMore.addEventListener("click", function () {
+    parkingVisibleCount = Math.min(parkingVisibleCount + parkingBatchSize, listedFacilities.length);
+    showParkingStatus("가까운 주차장 " + parkingVisibleCount + "곳입니다. 거리는 실제 경로가 아닌 직선거리입니다.");
+    renderParkingResults();
+  });
+
   clearFacility.addEventListener("click", function () {
+    var requestId;
     if (!engine || typeof engine.selectFacility !== "function") return;
+    requestId = ++facilityRequestId;
     Promise.resolve(engine.selectFacility(null)).then(function () {
+      if (requestId !== facilityRequestId) return;
+      selectedFacilityId = null;
       Array.prototype.forEach.call(parkingResults.querySelectorAll("button"), function (item) {
         item.setAttribute("aria-pressed", "false");
       });
@@ -414,6 +613,7 @@
       showParkingStatus("시설 선택을 해제했습니다. URL만 분석할 수 있습니다.");
       if (lastAnalyzedUrl) runEngine("analyzeUrl", lastAnalyzedUrl, "URL 단독 분석");
     }).catch(function (error) {
+      if (requestId !== facilityRequestId) return;
       showParkingStatus(error && error.message ? error.message : "시설 선택을 해제하지 못했습니다.");
     });
   });
