@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2f6f62">
+  <meta name="description" content="꿈꾸는 집을 직접 설계하고 실제 아파트 시세와 내 집 마련 기간을 알아보는 서비스">
+  <title>나만의 집 만들기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="#step-1">나만의 집 만들기</a>
+      <p>원하는 공간을 고르고, 0.5m 격자 위에 꿈꾸는 집을 지어 보세요.</p>
+    </header>
+
+    <nav class="step-nav" aria-label="진행 단계">
+      <ol>
+        <li class="is-current" data-step-indicator="1"><span>1</span><strong>조건 고르기</strong></li>
+        <li data-step-indicator="2"><span>2</span><strong>평면도 설계</strong></li>
+        <li aria-disabled="true"><span>3</span><strong>시세 비교</strong></li>
+        <li aria-disabled="true"><span>4</span><strong>견적서</strong></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section class="step-section" id="step-1" aria-labelledby="step-1-title">
+        <div class="section-intro">
+          <p class="eyebrow">Step 1</p>
+          <h1 id="step-1-title">어떤 집을 꿈꾸세요?</h1>
+          <p>방과 화장실 수를 고르면 근거 데이터에 맞는 전용면적과 공간별 시작 크기를 보여 드려요.</p>
+        </div>
+
+        <div class="condition-grid">
+          <section class="panel choice-panel" aria-labelledby="condition-title">
+            <h2 id="condition-title">집 조건 선택</h2>
+            <div class="choice-row">
+              <span class="field-name">방</span>
+              <div class="segmented" id="rooms" aria-label="방 개수"></div>
+            </div>
+            <div class="choice-row">
+              <span class="field-name">화장실</span>
+              <div class="segmented" id="baths" aria-label="화장실 개수"></div>
+            </div>
+            <div class="data-status" id="data-status" role="status">면적 기준 데이터를 확인하고 있어요.</div>
+          </section>
+
+          <section class="panel recommendation-panel" aria-labelledby="recommendation-title">
+            <div>
+              <p class="eyebrow">추천 면적</p>
+              <h2 id="recommendation-title">근거 데이터를 준비하고 있어요</h2>
+            </div>
+            <div class="area-summary" id="area-summary" hidden>
+              <div><span>전용면적</span><strong id="exclusive-area"></strong></div>
+              <div><span>공급면적 기준</span><strong id="supply-label"></strong></div>
+            </div>
+            <p id="recommendation-note">`logic.js`와 면적 가이드가 연결되면 추천 결과가 표시됩니다.</p>
+            <p class="source" id="area-source" hidden></p>
+          </section>
+        </div>
+
+        <section class="panel piece-summary" aria-labelledby="piece-summary-title">
+          <div>
+            <p class="eyebrow">공간별 시작 크기</p>
+            <h2 id="piece-summary-title">설계에 사용할 공간</h2>
+          </div>
+          <div class="piece-list" id="piece-list">
+            <p class="empty-copy">면적 데이터가 준비되면 거실·주방·방·욕실·현관 크기가 표시됩니다.</p>
+          </div>
+          <p class="fine-print">공간 크기는 공공데이터를 바탕으로 한 설계용 예시이며 실제 분양 도면과 다를 수 있습니다.</p>
+        </section>
+
+        <div class="step-actions">
+          <button class="primary-button" id="go-step-2" type="button" disabled>평면도 설계하기</button>
+        </div>
+      </section>
+
+      <section class="step-section" id="step-2" aria-labelledby="step-2-title" hidden>
+        <div class="section-intro board-intro">
+          <div>
+            <p class="eyebrow">Step 2</p>
+            <h1 id="step-2-title">공간을 끌어 집을 완성하세요</h1>
+            <p>조각은 0.5m 단위로 움직입니다. 아래쪽이 햇빛이 드는 남쪽이에요.</p>
+          </div>
+          <button class="text-button" id="back-step-1" type="button">← 조건 다시 고르기</button>
+        </div>
+
+        <section class="panel board-panel" aria-label="집 평면도 편집기">
+          <div class="board-head">
+            <div>
+              <h2>평면도 편집판</h2>
+              <p class="board-dimensions" id="board-dimensions"></p>
+            </div>
+            <p class="selection-status" id="selection-status" aria-live="polite">조각을 선택해 주세요.</p>
+          </div>
+
+          <div class="tools" aria-label="평면도 도구">
+            <button class="secondary-button" id="rotate" type="button" disabled>90도 회전</button>
+            <button class="secondary-button" id="reset-size" type="button" disabled>크기 복원</button>
+            <button class="secondary-button" id="auto-place" type="button">예시 배치</button>
+            <button class="secondary-button danger-button" id="clear-board" type="button">전체 초기화</button>
+          </div>
+
+          <div class="board-scroll" id="board-scroll">
+            <svg id="board" role="img" aria-label="0.5미터 격자의 집 평면도 편집판"></svg>
+          </div>
+
+          <div class="board-help">
+            <p><strong>PC</strong> 조각을 마우스로 끌고, 선택한 조각의 네 방향 테두리로 크기를 바꾸세요.</p>
+            <p><strong>모바일</strong> 조각을 손가락으로 끌 수 있습니다. 빈 도면을 밀면 좌우로 살펴볼 수 있어요.</p>
+          </div>
+        </section>
+
+        <section class="panel check-panel" aria-labelledby="check-title">
+          <div>
+            <p class="eyebrow">배치 확인</p>
+            <h2 id="check-title">공간 연결과 남향 거실</h2>
+          </div>
+          <ul class="check-list" id="check-list"></ul>
+          <p class="fine-print">이 검사는 격자상 인접 여부를 확인하는 설계 보조 기능입니다. 문·기둥·설비를 포함한 건축 검토 결과가 아닙니다.</p>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      <strong>나만의 집 만들기</strong>
+      <p>Step 3의 실거래가와 Step 4의 임금 견적은 공공데이터 연결 후 제공됩니다.</p>
+    </footer>
+  </div>
+</body>
+</html>
