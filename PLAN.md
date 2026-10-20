@@ -86,6 +86,23 @@ estimate({ price: 52000, job: '응용소프트웨어 개발자' })
 
 공간 id: living, kitchen, room1~room3(방1이 가장 큰 방), bath1~bath2, entry. 크기는 [가로m, 세로m], 격자 한 칸 0.5m.
 
+
+## 추가: 실제 도면과 배치 일치율 (10/20 17시)
+
+- `data/plans.json`: LH 주택 평면도 현황(공공데이터포털 15037046)에서 59·74·84형 등 11장을 방 사각형으로 옮김. 좌표는 집 외곽을 0~1로 둔 값, 남쪽이 아래
+- `data/apartments-daejeon.json`: 국토부 매매·전월세 실거래 API로 받은 대전 5개 구 2025-10~2026-09 계약분을 단지·면적별로 묶음 (711건, 474개 단지)
+- `data/area-guide.json`: 방·화장실 조합 6개의 평수와 조각 크기(0.5m 단위). LH 도면 11장에서 잰 거실:주방:안방 비율(1:0.50:0.63)과 맞춤
+- 시안 `prototype/index.html`에 Step 3 "내 그림과 가장 닮은 실제 집" 화면(나란히/겹쳐 보기, 공간별 위치 같음/다름) 추가
+
+```js
+import { recommendArea, findSimilar, toRects, matchPlans, estimate } from './logic.js';
+const mine = toRects(state.pieces, state.cols, state.rows);      // 집 안에 놓은 조각만
+const top3 = await matchPlans(mine, { area: 84, rooms: 3 });
+// → [{ plan: {apt, type, region, area, rooms, baths, rects, source}, score: 53, parts: [{name:'거실', same:true}, ...] }]
+const near = await findSimilar({ area: top3[0].plan.area, gu: '서구', limit: 10 });
+const quote = await estimate({ price: near.summary.medianSale, monthly: 300 });  // job 연결은 wages.json 준비 후
+```
+
 ## 일정
 
 | 시간 | 혜성 + Claude | 경민 + Codex |

@@ -74,6 +74,21 @@ svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
 .notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .notes li { padding: 8px 12px; border-radius: 8px; font-size: 14px; background: var(--warn-bg); border-left: 3px solid var(--warn); }
 .notes li.ok { background: color-mix(in srgb, var(--accent) 10%, var(--sheet)); border-left-color: var(--accent); }
+.matches { display: grid; gap: 14px; }
+.match { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; }
+.match.best { border-color: var(--accent); border-width: 2px; }
+.match-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.match-head h3 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: 20px; }
+.match-head .sub { color: var(--ink-soft); font-size: 13px; }
+.pct { font-family: var(--f-display); font-size: 34px; color: var(--accent); line-height: 1; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pair.overlay { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+.pair figure { margin: 0; display: grid; gap: 4px; }
+.pair figcaption { font-size: 12px; color: var(--ink-soft); font-family: var(--f-mono); }
+.diff { display: flex; gap: 6px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.diff li { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); }
+.diff li.same { border-color: var(--accent); color: var(--accent); }
+.match a { color: var(--accent); font-size: 13px; }
 .foot { font-size: 12px; color: var(--ink-soft); margin: 0; }
 </style>
 
@@ -110,7 +125,17 @@ svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
     </div>
     <svg id="board" role="img" aria-label="집 도면 편집판"></svg>
     <ul class="notes" id="notes"></ul>
+    <div class="tools"><button class="btn" id="matchBtn" type="button">실제 아파트 도면과 비교하기</button></div>
     <p class="foot">조각을 누르면 선택되고, "돌리기"로 가로·세로를 바꿀 수 있어요. 집 안에 놓은 조각은 위·아래·왼쪽·오른쪽 테두리를 잡고 끌어 크기를 바꿀 수 있고, "원래 크기로"를 누르면 평수 기준 크기로 돌아갑니다. 겹치게 놓으면 원래 자리로 돌아갑니다. 공간 크기는 평수에 맞춘 예시 비율이며 실제 분양 면적과 다를 수 있어요.</p>
+  </section>
+
+  <section class="panel" aria-label="닮은 도면" id="matchPanel" hidden>
+    <div class="board-head">
+      <div><div class="step-label">Step 3</div><h2>내 그림과 가장 닮은 실제 집</h2></div>
+      <div class="seg" id="viewMode"><button type="button" aria-pressed="true" data-v="side">나란히</button><button type="button" aria-pressed="false" data-v="overlay">겹쳐 보기</button></div>
+    </div>
+    <div class="matches" id="matches"></div>
+    <p class="foot">배치 일치율은 두 도면을 같은 크기로 맞춘 뒤, 같은 칸에 같은 종류의 공간(거실·주방·방·욕실·현관)이 있는 비율로 계산합니다. 도면은 LH 주택 평면도 현황(공공데이터포털)을 보고 방 위치만 단순하게 다시 그린 것이라 실제 치수와 다를 수 있어요.</p>
   </section>
 </div>
 
@@ -397,6 +422,97 @@ function check() {
   }
   document.getElementById("notes").innerHTML = notes.map(n => `<li class="${n.ok ? "ok" : ""}">${n.t}</li>`).join("");
 }
+
+// ───── 실제 도면과 비교 ─────
+// 도면 한 건: 남쪽이 아래, 좌표는 집 외곽 사각형을 0~1로 둔 값. t = living|kitchen|room|bath|entry
+const PLANS = /*PLANS*/[{"id": "lh-guri-galmae-s1-84a", "apt": "구리갈매 S1블록", "type": "84A", "region": "경기 구리", "area": 84, "rooms": 3, "baths": 2, "aspect": 1.4, "rects": [{"t": "room", "x": 0.013, "y": 0.565, "w": 0.19, "h": 0.388, "n": "침실2"}, {"t": "room", "x": 0.213, "y": 0.565, "w": 0.192, "h": 0.388, "n": "침실3"}, {"t": "living", "x": 0.413, "y": 0.43, "w": 0.313, "h": 0.523}, {"t": "kitchen", "x": 0.447, "y": 0.116, "w": 0.228, "h": 0.221}, {"t": "room", "x": 0.737, "y": 0.465, "w": 0.252, "h": 0.384, "n": "침실1"}, {"t": "bath", "x": 0.017, "y": 0.279, "w": 0.117, "h": 0.267}, {"t": "bath", "x": 0.742, "y": 0.233, "w": 0.108, "h": 0.233}, {"t": "entry", "x": 0.167, "y": 0.244, "w": 0.1, "h": 0.198}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-guri-galmae-s1-59a", "apt": "구리갈매 S1블록", "type": "59A", "region": "경기 구리", "area": 59, "rooms": 3, "baths": 2, "aspect": 1.05, "rects": [{"t": "room", "x": 0.017, "y": 0.557, "w": 0.304, "h": 0.295, "n": "침실1"}, {"t": "living", "x": 0.337, "y": 0.432, "w": 0.38, "h": 0.42}, {"t": "room", "x": 0.735, "y": 0.545, "w": 0.25, "h": 0.307, "n": "침실2"}, {"t": "room", "x": 0.178, "y": 0.159, "w": 0.217, "h": 0.273, "n": "침실3"}, {"t": "kitchen", "x": 0.417, "y": 0.148, "w": 0.267, "h": 0.284}, {"t": "entry", "x": 0.728, "y": 0.227, "w": 0.098, "h": 0.193}, {"t": "bath", "x": 0.837, "y": 0.33, "w": 0.141, "h": 0.205}, {"t": "bath", "x": 0.022, "y": 0.216, "w": 0.148, "h": 0.216}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-sejong-2-1m3-84a", "apt": "세종 행정중심복합도시 2-1M3블록", "type": "84A", "region": "세종", "area": 84, "rooms": 3, "baths": 2, "aspect": 1.51, "rects": [{"t": "room", "x": 0.026, "y": 0.475, "w": 0.244, "h": 0.359, "n": "침실1"}, {"t": "bath", "x": 0.162, "y": 0.225, "w": 0.099, "h": 0.215}, {"t": "kitchen", "x": 0.313, "y": 0.103, "w": 0.238, "h": 0.368}, {"t": "living", "x": 0.29, "y": 0.571, "w": 0.296, "h": 0.391}, {"t": "room", "x": 0.609, "y": 0.624, "w": 0.176, "h": 0.314, "n": "침실2"}, {"t": "room", "x": 0.797, "y": 0.624, "w": 0.183, "h": 0.314, "n": "침실3"}, {"t": "entry", "x": 0.739, "y": 0.287, "w": 0.102, "h": 0.184}, {"t": "bath", "x": 0.873, "y": 0.371, "w": 0.107, "h": 0.218}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-sejong-2-1m3-74a", "apt": "세종 행정중심복합도시 2-1M3블록", "type": "74A", "region": "세종", "area": 74, "rooms": 3, "baths": 2, "aspect": 1.51, "rects": [{"t": "room", "x": 0.027, "y": 0.479, "w": 0.257, "h": 0.35, "n": "침실1"}, {"t": "bath", "x": 0.168, "y": 0.213, "w": 0.108, "h": 0.229}, {"t": "kitchen", "x": 0.302, "y": 0.14, "w": 0.242, "h": 0.315}, {"t": "living", "x": 0.302, "y": 0.584, "w": 0.292, "h": 0.371}, {"t": "room", "x": 0.615, "y": 0.608, "w": 0.166, "h": 0.327, "n": "침실2"}, {"t": "room", "x": 0.794, "y": 0.608, "w": 0.185, "h": 0.327, "n": "침실3"}, {"t": "entry", "x": 0.701, "y": 0.281, "w": 0.155, "h": 0.161}, {"t": "bath", "x": 0.868, "y": 0.345, "w": 0.11, "h": 0.223}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-sejong-2-1m3-59a", "apt": "세종 행정중심복합도시 2-1M3블록", "type": "59A", "region": "세종", "area": 59, "rooms": 3, "baths": 2, "aspect": 1.01, "rects": [{"t": "room", "x": 0.017, "y": 0.562, "w": 0.28, "h": 0.303, "n": "침실2"}, {"t": "living", "x": 0.319, "y": 0.544, "w": 0.333, "h": 0.321}, {"t": "room", "x": 0.674, "y": 0.562, "w": 0.309, "h": 0.284, "n": "침실1"}, {"t": "kitchen", "x": 0.401, "y": 0.147, "w": 0.193, "h": 0.279}, {"t": "room", "x": 0.616, "y": 0.071, "w": 0.21, "h": 0.341, "n": "침실3"}, {"t": "bath", "x": 0.019, "y": 0.338, "w": 0.141, "h": 0.199}, {"t": "bath", "x": 0.845, "y": 0.176, "w": 0.119, "h": 0.199}, {"t": "entry", "x": 0.174, "y": 0.272, "w": 0.109, "h": 0.147}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-goyang-hyangdong-s2-84", "apt": "고양향동 S-2블록", "type": "84", "region": "경기 고양", "area": 84, "rooms": 3, "baths": 2, "aspect": 1.43, "rects": [{"t": "room", "x": 0.008, "y": 0.626, "w": 0.185, "h": 0.33, "n": "침실3"}, {"t": "room", "x": 0.203, "y": 0.626, "w": 0.185, "h": 0.33, "n": "침실2"}, {"t": "living", "x": 0.4, "y": 0.484, "w": 0.308, "h": 0.473}, {"t": "room", "x": 0.726, "y": 0.484, "w": 0.243, "h": 0.352, "n": "침실1"}, {"t": "kitchen", "x": 0.454, "y": 0.11, "w": 0.254, "h": 0.363}, {"t": "entry", "x": 0.154, "y": 0.308, "w": 0.072, "h": 0.165}, {"t": "bath", "x": 0.015, "y": 0.374, "w": 0.103, "h": 0.224}, {"t": "bath", "x": 0.731, "y": 0.237, "w": 0.105, "h": 0.224}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-gimpo-hangang-ac05-84a", "apt": "김포한강 Ac-05블록", "type": "84A", "region": "경기 김포", "area": 84, "rooms": 3, "baths": 2, "aspect": 1.36, "rects": [{"t": "room", "x": 0.009, "y": 0.559, "w": 0.183, "h": 0.288, "n": "침실3"}, {"t": "room", "x": 0.203, "y": 0.559, "w": 0.188, "h": 0.405, "n": "침실2"}, {"t": "living", "x": 0.4, "y": 0.45, "w": 0.328, "h": 0.514}, {"t": "room", "x": 0.744, "y": 0.45, "w": 0.246, "h": 0.366, "n": "침실1"}, {"t": "kitchen", "x": 0.51, "y": 0.072, "w": 0.219, "h": 0.369}, {"t": "entry", "x": 0.192, "y": 0.247, "w": 0.086, "h": 0.177}, {"t": "bath", "x": 0.013, "y": 0.333, "w": 0.106, "h": 0.207}, {"t": "bath", "x": 0.881, "y": 0.108, "w": 0.106, "h": 0.225}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-goyang-hyangdong-s1-74a", "apt": "고양향동 S-1블록", "type": "74A", "region": "경기 고양", "area": 74, "rooms": 3, "baths": 2, "aspect": 1.03, "rects": [{"t": "room", "x": 0.015, "y": 0.638, "w": 0.268, "h": 0.23, "n": "침실2"}, {"t": "living", "x": 0.301, "y": 0.623, "w": 0.339, "h": 0.321}, {"t": "room", "x": 0.659, "y": 0.638, "w": 0.305, "h": 0.302, "n": "침실1"}, {"t": "room", "x": 0.589, "y": 0.255, "w": 0.223, "h": 0.258, "n": "침실3"}, {"t": "kitchen", "x": 0.361, "y": 0.142, "w": 0.219, "h": 0.387}, {"t": "entry", "x": 0.151, "y": 0.343, "w": 0.1, "h": 0.185}, {"t": "bath", "x": 0.02, "y": 0.434, "w": 0.122, "h": 0.185}, {"t": "bath", "x": 0.827, "y": 0.33, "w": 0.124, "h": 0.183}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-busan-mandeok5-59a", "apt": "부산만덕5 02블록", "type": "59A", "region": "부산", "area": 59, "rooms": 3, "baths": 2, "aspect": 1.12, "rects": [{"t": "room", "x": 0.019, "y": 0.599, "w": 0.293, "h": 0.254, "n": "침실2"}, {"t": "living", "x": 0.328, "y": 0.464, "w": 0.33, "h": 0.499}, {"t": "room", "x": 0.676, "y": 0.64, "w": 0.306, "h": 0.322, "n": "침실1"}, {"t": "room", "x": 0.676, "y": 0.179, "w": 0.306, "h": 0.285, "n": "침실3"}, {"t": "kitchen", "x": 0.5, "y": 0.037, "w": 0.157, "h": 0.291}, {"t": "entry", "x": 0.17, "y": 0.27, "w": 0.107, "h": 0.2}, {"t": "bath", "x": 0.019, "y": 0.297, "w": 0.139, "h": 0.285}, {"t": "bath", "x": 0.769, "y": 0.47, "w": 0.213, "h": 0.166}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-busan-mandeok5-51", "apt": "부산만덕5 02블록", "type": "51", "region": "부산", "area": 51, "rooms": 2, "baths": 1, "aspect": 0.73, "rects": [{"t": "kitchen", "x": 0.034, "y": 0.197, "w": 0.298, "h": 0.3}, {"t": "living", "x": 0.026, "y": 0.497, "w": 0.491, "h": 0.466}, {"t": "room", "x": 0.545, "y": 0.476, "w": 0.426, "h": 0.3, "n": "침실1"}, {"t": "room", "x": 0.545, "y": 0.031, "w": 0.426, "h": 0.255, "n": "침실2"}, {"t": "bath", "x": 0.531, "y": 0.304, "w": 0.213, "h": 0.161}, {"t": "entry", "x": 0.361, "y": 0.006, "w": 0.156, "h": 0.186}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}, {"id": "lh-busan-myeongji-b1-84a1", "apt": "부산명지 B-1블록", "type": "84A1", "region": "부산", "area": 84, "rooms": 3, "baths": 2, "aspect": 1.44, "rects": [{"t": "room", "x": 0.029, "y": 0.444, "w": 0.241, "h": 0.34, "n": "침실1"}, {"t": "bath", "x": 0.033, "y": 0.215, "w": 0.111, "h": 0.208}, {"t": "kitchen", "x": 0.289, "y": 0.048, "w": 0.216, "h": 0.375}, {"t": "living", "x": 0.281, "y": 0.433, "w": 0.303, "h": 0.469}, {"t": "room", "x": 0.596, "y": 0.548, "w": 0.183, "h": 0.354, "n": "침실2"}, {"t": "room", "x": 0.786, "y": 0.548, "w": 0.199, "h": 0.292, "n": "침실3"}, {"t": "entry", "x": 0.707, "y": 0.235, "w": 0.072, "h": 0.177}, {"t": "bath", "x": 0.88, "y": 0.319, "w": 0.101, "h": 0.208}], "source": "https://www.data.go.kr/data/15037046/fileData.do", "sourceName": "LH 주택 평면도 현황, 공공데이터포털"}]/*END*/;
+const CAT = { living: "living", kitchen: "kitchen", room1: "room", room2: "room", room3: "room", bath1: "bath", bath2: "bath", entry: "entry" };
+const CAT_NAME = { living: "거실", kitchen: "주방", room: "방", bath: "욕실", entry: "현관" };
+const CAT_COLOR = { living: "--living", kitchen: "--kitchen", room: "--room1", bath: "--bath", entry: "--entry" };
+const GX = 24, GY = 12;
+
+function myRects() {
+  return S.pieces.filter(p => p.x !== null).map(p => ({ t: CAT[p.id], x: p.x / S.cols, y: p.y / S.rows, w: p.w / S.cols, h: p.h / S.rows }));
+}
+function raster(rects) {
+  const g = [];
+  for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+    const cx = (i + .5) / GX, cy = (j + .5) / GY;
+    const r = rects.find(r => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h);
+    g.push(r ? r.t : null);
+  }
+  return g;
+}
+function centroids(rects) {
+  const c = {};
+  rects.forEach(r => {
+    const a = r.w * r.h, k = c[r.t] || (c[r.t] = { x: 0, y: 0, a: 0 });
+    k.x += (r.x + r.w / 2) * a; k.y += (r.y + r.h / 2) * a; k.a += a;
+  });
+  Object.values(c).forEach(k => { k.x /= k.a; k.y /= k.a; });
+  return c;
+}
+function compare(mine, plan) {
+  const a = raster(mine), b = raster(plan.rects);
+  let same = 0, union = 0;
+  a.forEach((v, i) => { if (v || b[i]) union++; if (v && v === b[i]) same++; });
+  const overlap = union ? same / union : 0;
+  const ca = centroids(mine), cb = centroids(plan.rects);
+  const parts = Object.keys(CAT_NAME).map(t => {
+    if (!ca[t] || !cb[t]) return { t, d: 1 };
+    return { t, d: Math.hypot(ca[t].x - cb[t].x, (ca[t].y - cb[t].y) * .5) };
+  });
+  const place = parts.reduce((s, p) => s + Math.max(0, 1 - p.d / .45), 0) / parts.length;
+  const myRooms = mine.filter(r => r.t === "room").length, myBaths = mine.filter(r => r.t === "bath").length;
+  const penalty = Math.abs(myRooms - plan.rooms) * .08 + Math.abs(myBaths - plan.baths) * .05;
+  const score = Math.max(0, Math.min(1, .55 * overlap + .45 * place - penalty));
+  return { plan, score, parts };
+}
+function planSvg(rects, overlayRects) {
+  const W = 240, H = 120;
+  let g = `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="var(--hall)" stroke="var(--ink)" stroke-width="2"/>`;
+  rects.forEach(r => {
+    g += `<rect x="${r.x * W}" y="${r.y * H}" width="${r.w * W}" height="${r.h * H}" fill="var(${CAT_COLOR[r.t]})" stroke="var(--ink)" stroke-width="1"/>`;
+    if (r.w * W > 22 && r.h * H > 12) g += `<text x="${(r.x + r.w / 2) * W}" y="${(r.y + r.h / 2) * H + 4}" text-anchor="middle" font-size="10">${r.n || CAT_NAME[r.t]}</text>`;
+  });
+  (overlayRects || []).forEach(r => {
+    g += `<rect x="${r.x * W}" y="${r.y * H}" width="${r.w * W}" height="${r.h * H}" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 3"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="평면도">${g}</svg>`;
+}
+let viewMode = "side";
+function showMatches() {
+  const mine = myRects();
+  const panel = document.getElementById("matchPanel");
+  panel.hidden = false;
+  if (mine.length < S.pieces.length) {
+    document.getElementById("matches").innerHTML = `<p>조각을 모두 집 안에 놓은 뒤 비교할 수 있어요.</p>`;
+    return;
+  }
+  const area = RECO[S.rooms + "-" + S.baths].area;
+  const ranked = PLANS.filter(p => Math.abs(p.area - area) <= 16 || p.rooms === S.rooms)
+    .map(p => compare(mine, p)).sort((a, b) => b.score - a.score).slice(0, 3);
+  document.getElementById("matches").innerHTML = ranked.map((m, k) => {
+    const p = m.plan, pct = Math.round(m.score * 100);
+    const chips = m.parts.map(x => `<li class="${x.d < .18 ? "same" : ""}">${CAT_NAME[x.t]} ${x.d < .18 ? "위치 같음" : "위치 다름"}</li>`).join("");
+    const pair = viewMode === "overlay"
+      ? `<div class="pair overlay"><figure>${planSvg(p.rects, mine)}<figcaption>색칠 = ${p.apt} ${p.type} · 빨간 점선 = 내 그림</figcaption></figure></div>`
+      : `<div class="pair"><figure>${planSvg(mine)}<figcaption>내 그림</figcaption></figure><figure>${planSvg(p.rects)}<figcaption>${p.apt} ${p.type}</figcaption></figure></div>`;
+    return `<article class="match${k === 0 ? " best" : ""}">
+      <div class="match-head"><div><h3>${k === 0 ? "1위 · " : ""}${p.apt} ${p.type}</h3><div class="sub">${p.region} · 전용 ${p.area}㎡ · 방 ${p.rooms} 욕실 ${p.baths}</div></div><div class="pct">${pct}%</div></div>
+      ${pair}
+      <ul class="diff">${chips}</ul>
+      ${p.source ? `<a href="${p.source}" target="_blank" rel="noopener">원본 평면도 보기 (${p.sourceName || "출처"})</a>` : ""}
+    </article>`;
+  }).join("") || "<p>비교할 도면이 아직 없어요.</p>";
+}
+document.getElementById("matchBtn").addEventListener("click", () => { showMatches(); document.getElementById("matchPanel").scrollIntoView({ behavior: "smooth" }); });
+document.getElementById("viewMode").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  viewMode = b.dataset.v;
+  document.querySelectorAll("#viewMode button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  showMatches();
+});
 
 setup();
 autoPlace();
