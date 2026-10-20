@@ -6,10 +6,14 @@
   var MARGIN = 2;
   var NAMES = { living: "거실", kitchen: "주방", room1: "방1", room2: "방2", room3: "방3", bath1: "욕실1", bath2: "욕실2", entry: "현관" };
   var COLORS = { living: "--living", kitchen: "--kitchen", room1: "--room1", room2: "--room2", room3: "--room3", bath1: "--bath", bath2: "--bath", entry: "--entry" };
-  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, trayRows: 0, recommendation: null, guide: null };
+  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, trayRows: 0, recommendation: null, guide: null, gu: "서구", similar: null, selectedApartment: null, estimate: null };
   var logicApi = null;
   var areaGuides = [];
+  var jobs = [];
+  var wageAsOf = "";
   var recommendationRequestId = 0;
+  var similarRequestId = 0;
+  var estimateRequestId = 0;
   var drag = null;
   var resize = null;
 
@@ -26,6 +30,8 @@
   var goStep2 = document.getElementById("go-step-2");
   var step1 = document.getElementById("step-1");
   var step2 = document.getElementById("step-2");
+  var step3 = document.getElementById("step-3");
+  var step4 = document.getElementById("step-4");
   var backStep1 = document.getElementById("back-step-1");
   var board = document.getElementById("board");
   var boardDimensions = document.getElementById("board-dimensions");
@@ -35,6 +41,31 @@
   var autoPlaceButton = document.getElementById("auto-place");
   var clearBoardButton = document.getElementById("clear-board");
   var checkList = document.getElementById("check-list");
+  var goStep3 = document.getElementById("go-step-3");
+  var backStep2 = document.getElementById("back-step-2");
+  var backStep2Bottom = document.getElementById("back-step-2-bottom");
+  var districtControl = document.getElementById("district-control");
+  var similarStatus = document.getElementById("similar-status");
+  var marketSummary = document.getElementById("market-summary");
+  var summaryCount = document.getElementById("summary-count");
+  var summarySale = document.getElementById("summary-sale");
+  var summaryJeonse = document.getElementById("summary-jeonse");
+  var apartmentList = document.getElementById("apartment-list");
+  var goStep4 = document.getElementById("go-step-4");
+  var backStep3 = document.getElementById("back-step-3");
+  var backStep3Bottom = document.getElementById("back-step-3-bottom");
+  var estimateArea = document.getElementById("estimate-area");
+  var estimatePlan = document.getElementById("estimate-plan");
+  var estimateApartment = document.getElementById("estimate-apartment");
+  var estimateApartmentMeta = document.getElementById("estimate-apartment-meta");
+  var estimatePrice = document.getElementById("estimate-price");
+  var wageSourceNote = document.getElementById("wage-source-note");
+  var jobSelect = document.getElementById("job-select");
+  var estimateResultMessage = document.getElementById("estimate-result-message");
+  var estimateResultDetails = document.getElementById("estimate-result-details");
+  var estimateMonthly = document.getElementById("estimate-monthly");
+  var estimateYears = document.getElementById("estimate-years");
+  var saveEstimateButton = document.getElementById("save-estimate");
 
   function idsFor(rooms, baths) {
     var ids = ["living", "kitchen"];
@@ -48,6 +79,19 @@
   function setDataStatus(message, status) {
     dataStatus.textContent = message;
     dataStatus.dataset.state = status || "";
+  }
+
+  function resetDownstream() {
+    similarRequestId += 1;
+    estimateRequestId += 1;
+    state.similar = null;
+    state.selectedApartment = null;
+    state.estimate = null;
+    marketSummary.hidden = true;
+    apartmentList.replaceChildren();
+    goStep4.disabled = true;
+    saveEstimateButton.disabled = true;
+    estimateResultDetails.hidden = true;
   }
 
   function renderSegmented(control, values, current, onPick) {
@@ -76,6 +120,7 @@
   }
 
   function showUnavailable(message) {
+    resetDownstream();
     state.recommendation = null;
     state.guide = null;
     state.pieces = [];
@@ -594,10 +639,392 @@
     }
   }
 
+  function formatPrice(value) {
+    var price = Number(value);
+    var eok;
+    var remainder;
+    if (!Number.isFinite(price) || price <= 0) return "정보 없음";
+    eok = Math.floor(price / 10000);
+    remainder = Math.round(price % 10000);
+    if (eok && remainder) return eok + "억 " + remainder.toLocaleString("ko-KR") + "만원";
+    if (eok) return eok + "억원";
+    return remainder.toLocaleString("ko-KR") + "만원";
+  }
+
+  function renderDistrictControl() {
+    districtControl.replaceChildren();
+    ["동구", "중구", "서구", "유성구", "대덕구"].forEach(function (gu) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = gu;
+      button.setAttribute("aria-pressed", String(gu === state.gu));
+      button.addEventListener("click", function () {
+        state.gu = gu;
+        renderDistrictControl();
+        loadSimilar();
+      });
+      districtControl.append(button);
+    });
+  }
+
+  function setSimilarStatus(message, status) {
+    similarStatus.textContent = message;
+    similarStatus.dataset.state = status || "";
+  }
+
+  function renderMarketSummary(result) {
+    var summary = result.summary || {};
+    var count = Number(summary.count);
+    summaryCount.textContent = (Number.isFinite(count) ? count : result.items.length) + "곳";
+    summarySale.textContent = formatPrice(summary.medianSale);
+    summaryJeonse.textContent = formatPrice(summary.medianJeonse);
+    marketSummary.hidden = false;
+  }
+
+  function apartmentMeta(item) {
+    var parts = [];
+    var area = Number(item.area);
+    if (item.dong) parts.push(String(item.dong));
+    if (Number.isFinite(area)) parts.push("전용 " + area.toFixed(1) + "㎡");
+    if (item.built) parts.push(String(item.built) + "년 준공");
+    return parts.join(" · ") || "상세 정보 없음";
+  }
+
+  function selectApartment(item) {
+    state.selectedApartment = item;
+    state.estimate = null;
+    goStep4.disabled = false;
+    saveEstimateButton.disabled = true;
+    renderApartmentList(state.similar.items);
+  }
+
+  function renderApartmentList(items) {
+    apartmentList.replaceChildren();
+    items.forEach(function (item) {
+      var listItem = document.createElement("li");
+      var card = document.createElement("article");
+      var heading = document.createElement("h3");
+      var meta = document.createElement("p");
+      var prices = document.createElement("div");
+      var sale = document.createElement("div");
+      var saleLabel = document.createElement("span");
+      var saleValue = document.createElement("strong");
+      var jeonse = document.createElement("div");
+      var jeonseLabel = document.createElement("span");
+      var jeonseValue = document.createElement("strong");
+      var button = document.createElement("button");
+      var salePrice = Number(item.sale);
+      card.className = "apartment-card" + (state.selectedApartment === item ? " is-selected" : "");
+      heading.textContent = item.apt ? String(item.apt) : "단지명 정보 없음";
+      meta.className = "apartment-meta";
+      meta.textContent = apartmentMeta(item) + (item.saleDate ? " · 매매 " + String(item.saleDate) + " 기준" : "");
+      prices.className = "price-grid";
+      saleLabel.textContent = "최근 매매가";
+      saleValue.textContent = formatPrice(item.sale);
+      jeonseLabel.textContent = "최근 전세가";
+      jeonseValue.textContent = formatPrice(item.jeonse);
+      sale.append(saleLabel, saleValue);
+      jeonse.append(jeonseLabel, jeonseValue);
+      prices.append(sale, jeonse);
+      button.type = "button";
+      button.className = "secondary-button";
+      button.disabled = !Number.isFinite(salePrice) || salePrice <= 0;
+      button.setAttribute("aria-pressed", String(state.selectedApartment === item));
+      button.textContent = button.disabled ? "매매가 정보 없음" : state.selectedApartment === item ? "선택됨" : "이 아파트 선택";
+      button.addEventListener("click", function () { selectApartment(item); });
+      card.append(heading, meta, prices, button);
+      listItem.append(card);
+      apartmentList.append(listItem);
+    });
+  }
+
+  function loadSimilar() {
+    var requestId = ++similarRequestId;
+    var area = state.recommendation && Number(state.recommendation.area);
+    state.similar = null;
+    state.selectedApartment = null;
+    state.estimate = null;
+    marketSummary.hidden = true;
+    apartmentList.replaceChildren();
+    goStep4.disabled = true;
+    if (!Number.isFinite(area)) {
+      setSimilarStatus("추천 전용면적이 없어 아파트를 찾을 수 없어요.", "error");
+      return;
+    }
+    if (!logicApi || typeof logicApi.findSimilar !== "function") {
+      setSimilarStatus("아파트 검색 로직과 실거래 데이터를 준비하고 있어요.", "error");
+      return;
+    }
+    setSimilarStatus(state.gu + "의 전용면적 " + area + "㎡ 안팎 아파트를 찾고 있어요.");
+    Promise.resolve(logicApi.findSimilar({ area: area, gu: state.gu, limit: 10 })).then(function (result) {
+      var items;
+      var dates;
+      if (requestId !== similarRequestId) return;
+      if (!result || !Array.isArray(result.items)) throw new Error("아파트 검색 반환값이 규격과 다릅니다.");
+      items = result.items;
+      state.similar = { summary: result.summary || {}, items: items };
+      renderMarketSummary(state.similar);
+      renderApartmentList(items);
+      if (!items.length) {
+        setSimilarStatus(state.gu + "에서 조건에 맞는 아파트를 찾지 못했어요.", "error");
+        return;
+      }
+      dates = items.map(function (item) { return item.saleDate ? String(item.saleDate) : ""; }).filter(Boolean).sort();
+      setSimilarStatus(items.length + "개 결과를 찾았어요." + (dates.length ? " 최근 매매 " + dates[dates.length - 1] + " 기준입니다." : ""), "ready");
+    }).catch(function (error) {
+      if (requestId !== similarRequestId) return;
+      setSimilarStatus(error && error.message ? error.message : "아파트 데이터를 불러오지 못했어요.", "error");
+    });
+  }
+
+  function normalizeJobs(data) {
+    var source = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : Array.isArray(data.jobs) ? data.jobs : [];
+    var names = source.map(function (item) {
+      if (typeof item === "string") return item;
+      if (!item || typeof item !== "object") return "";
+      return item.job || item.name || item.occupation || "";
+    }).map(function (name) { return String(name).trim(); }).filter(Boolean);
+    return names.filter(function (name, index) { return names.indexOf(name) === index; });
+  }
+
+  function renderJobs() {
+    jobSelect.replaceChildren();
+    var option = document.createElement("option");
+    option.value = "";
+    option.textContent = jobs.length ? "직업을 선택해 주세요" : "직업 데이터를 준비하고 있어요";
+    jobSelect.append(option);
+    jobs.forEach(function (job) {
+      var item = document.createElement("option");
+      item.value = job;
+      item.textContent = job;
+      jobSelect.append(item);
+    });
+    jobSelect.disabled = !jobs.length;
+    wageSourceNote.textContent = jobs.length
+      ? "공공 임금데이터의 월급을 한 푼도 쓰지 않는 단순 비교입니다." + (wageAsOf ? " 임금 " + wageAsOf + " 기준." : "")
+      : "직업 데이터가 연결되면 월급 기준 기간을 계산합니다.";
+  }
+
+  function loadJobs() {
+    fetch("./data/wages.json").then(function (response) {
+      if (!response.ok) throw new Error("직업 데이터 응답 오류");
+      return response.json();
+    }).then(function (data) {
+      jobs = normalizeJobs(data);
+      wageAsOf = data && !Array.isArray(data) ? String(data.asOf || data.updatedAt || data.baseDate || "") : "";
+      renderJobs();
+    }).catch(function () {
+      jobs = [];
+      wageAsOf = "";
+      renderJobs();
+    });
+  }
+
+  function renderFloorplanPreview() {
+    var clone;
+    drawBoard();
+    clone = board.cloneNode(true);
+    clone.removeAttribute("id");
+    clone.setAttribute("viewBox", "0 0 " + ((state.cols + MARGIN * 2) * PX) + " " + ((state.rows + MARGIN * 2) * PX));
+    clone.setAttribute("aria-label", "내가 만든 집 평면도");
+    Array.prototype.forEach.call(clone.querySelectorAll(".piece"), function (element) {
+      var piece = state.pieces[Number(element.dataset.index)];
+      if (!piece || piece.x === null) {
+        element.remove();
+        return;
+      }
+      element.classList.remove("selected", "dragging", "bad");
+      Array.prototype.forEach.call(element.querySelectorAll(".resize-edge"), function (edge) { edge.remove(); });
+    });
+    estimatePlan.replaceChildren(clone);
+  }
+
+  function resetEstimateResult(message) {
+    state.estimate = null;
+    estimateRequestId += 1;
+    estimateResultMessage.textContent = message;
+    estimateResultDetails.hidden = true;
+    saveEstimateButton.disabled = true;
+  }
+
+  function renderEstimateStep() {
+    var apartment = state.selectedApartment;
+    var area = state.recommendation && Number(state.recommendation.area);
+    if (!apartment) return;
+    estimateArea.textContent = Number.isFinite(area) ? "전용 " + area + "㎡ 설계" : "전용면적 정보 없음";
+    estimateApartment.textContent = apartment.apt ? String(apartment.apt) : "단지명 정보 없음";
+    estimateApartmentMeta.textContent = apartmentMeta(apartment) + (apartment.saleDate ? " · " + String(apartment.saleDate) + " 기준" : "");
+    estimatePrice.textContent = formatPrice(apartment.sale);
+    jobSelect.value = "";
+    renderFloorplanPreview();
+    resetEstimateResult(jobs.length ? "직업을 선택하면 필요한 기간을 계산해요." : "직업 데이터를 준비하고 있어요.");
+  }
+
+  function runEstimate() {
+    var requestId;
+    var price;
+    var job = jobSelect.value;
+    if (!job) {
+      resetEstimateResult("직업을 선택하면 필요한 기간을 계산해요.");
+      return;
+    }
+    price = state.selectedApartment && Number(state.selectedApartment.sale);
+    if (!Number.isFinite(price) || price <= 0) {
+      resetEstimateResult("선택한 아파트의 매매가가 없어 계산할 수 없어요.");
+      return;
+    }
+    if (!logicApi || typeof logicApi.estimate !== "function") {
+      resetEstimateResult("견적 로직과 임금 데이터를 준비하고 있어요.");
+      return;
+    }
+    requestId = ++estimateRequestId;
+    estimateResultMessage.textContent = "내 집 마련 기간을 계산하고 있어요.";
+    estimateResultDetails.hidden = true;
+    saveEstimateButton.disabled = true;
+    Promise.resolve(logicApi.estimate({ price: price, job: job })).then(function (result) {
+      var monthly;
+      var years;
+      if (requestId !== estimateRequestId) return;
+      monthly = result && Number(result.monthly);
+      years = result && Number(result.years);
+      if (!result || !Number.isFinite(monthly) || !Number.isFinite(years) || typeof result.text !== "string") throw new Error("견적 반환값이 규격과 다릅니다.");
+      state.estimate = result;
+      estimateResultMessage.textContent = result.text;
+      estimateMonthly.textContent = formatPrice(monthly);
+      estimateYears.textContent = years.toFixed(1) + "년";
+      estimateResultDetails.hidden = false;
+      saveEstimateButton.disabled = false;
+    }).catch(function (error) {
+      if (requestId !== estimateRequestId) return;
+      resetEstimateResult(error && error.message ? error.message : "견적을 계산하지 못했어요.");
+    });
+  }
+
+  function wrapCanvasText(context, text, x, y, maxWidth, lineHeight) {
+    var words = String(text).split(" ");
+    var line = "";
+    var lineY = y;
+    words.forEach(function (word) {
+      var testLine = line ? line + " " + word : word;
+      if (line && context.measureText(testLine).width > maxWidth) {
+        context.fillText(line, x, lineY);
+        line = word;
+        lineY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    });
+    if (line) context.fillText(line, x, lineY);
+    return lineY;
+  }
+
+  function drawExportPlan(context, x, y, width, height) {
+    var scale = Math.min(width / state.cols, height / state.rows);
+    var planWidth = state.cols * scale;
+    var planHeight = state.rows * scale;
+    var left = x + (width - planWidth) / 2;
+    var top = y + (height - planHeight) / 2;
+    var column;
+    var row;
+    var styles = getComputedStyle(document.documentElement);
+    context.fillStyle = styles.getPropertyValue("--hall").trim() || "#fbfaf5";
+    context.fillRect(left, top, planWidth, planHeight);
+    context.strokeStyle = "#d9ded9";
+    context.lineWidth = 1;
+    for (column = 0; column <= state.cols; column += 1) {
+      context.beginPath();
+      context.moveTo(left + column * scale, top);
+      context.lineTo(left + column * scale, top + planHeight);
+      context.stroke();
+    }
+    for (row = 0; row <= state.rows; row += 1) {
+      context.beginPath();
+      context.moveTo(left, top + row * scale);
+      context.lineTo(left + planWidth, top + row * scale);
+      context.stroke();
+    }
+    state.pieces.forEach(function (piece) {
+      var pieceX;
+      var pieceY;
+      var pieceWidth;
+      var pieceHeight;
+      if (piece.x === null) return;
+      pieceX = left + piece.x * scale;
+      pieceY = top + piece.y * scale;
+      pieceWidth = piece.w * scale;
+      pieceHeight = piece.h * scale;
+      context.fillStyle = styles.getPropertyValue(COLORS[piece.id]).trim() || "#dde4df";
+      context.fillRect(pieceX, pieceY, pieceWidth, pieceHeight);
+      context.strokeStyle = "#1f2a2e";
+      context.strokeRect(pieceX, pieceY, pieceWidth, pieceHeight);
+      context.fillStyle = "#1f2a2e";
+      context.font = "700 18px sans-serif";
+      context.textAlign = "center";
+      context.fillText(NAMES[piece.id], pieceX + pieceWidth / 2, pieceY + pieceHeight / 2 + 6, Math.max(0, pieceWidth - 8));
+    });
+    context.strokeStyle = "#1f2a2e";
+    context.lineWidth = 5;
+    context.strokeRect(left, top, planWidth, planHeight);
+    context.textAlign = "left";
+  }
+
+  function saveEstimateImage() {
+    var canvas;
+    var context;
+    var apartment = state.selectedApartment;
+    var job = jobSelect.value;
+    if (!apartment || !state.estimate || !job) return;
+    canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1350;
+    context = canvas.getContext("2d");
+    context.fillStyle = "#f3f4ef";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#1f2a2e";
+    context.font = "700 54px sans-serif";
+    context.fillText("나만의 집 마련 견적서", 70, 95);
+    context.fillStyle = "#2f6f62";
+    context.font = "700 26px sans-serif";
+    context.fillText(estimateArea.textContent, 70, 145);
+    drawExportPlan(context, 70, 190, 940, 520);
+    context.fillStyle = "#1f2a2e";
+    context.font = "700 36px sans-serif";
+    wrapCanvasText(context, estimateApartment.textContent, 70, 780, 940, 46);
+    context.fillStyle = "#5d696c";
+    context.font = "24px sans-serif";
+    context.fillText(estimateApartmentMeta.textContent, 70, 835);
+    context.fillStyle = "#1f2a2e";
+    context.font = "700 32px sans-serif";
+    context.fillText("최근 매매가  " + estimatePrice.textContent, 70, 900);
+    context.fillText("직업  " + job, 70, 955);
+    context.fillStyle = "#2f6f62";
+    context.font = "700 40px sans-serif";
+    wrapCanvasText(context, state.estimate.text, 70, 1035, 940, 52);
+    context.fillStyle = "#5d696c";
+    context.font = "22px sans-serif";
+    wrapCanvasText(context, "월급을 모두 저축한다고 가정한 단순 비교이며 대출·세금·생활비를 반영하지 않습니다.", 70, 1250, 940, 30);
+    canvas.toBlob(function (blob) {
+      var url;
+      var link;
+      if (!blob) {
+        estimateResultMessage.textContent = "견적서 이미지를 만들지 못했어요.";
+        return;
+      }
+      url = URL.createObjectURL(blob);
+      link = document.createElement("a");
+      link.href = url;
+      link.download = "나만의-집-견적서.png";
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    }, "image/png");
+  }
+
   function showStep(number) {
     var indicators = document.querySelectorAll("[data-step-indicator]");
     step1.hidden = number !== 1;
     step2.hidden = number !== 2;
+    step3.hidden = number !== 3;
+    step4.hidden = number !== 4;
     Array.prototype.forEach.call(indicators, function (item) {
       item.classList.toggle("is-current", item.dataset.stepIndicator === String(number));
     });
@@ -611,12 +1038,30 @@
     drawBoard();
   });
   backStep1.addEventListener("click", function () { showStep(1); });
+  goStep3.addEventListener("click", function () {
+    showStep(3);
+    loadSimilar();
+  });
+  backStep2.addEventListener("click", function () { showStep(2); });
+  backStep2Bottom.addEventListener("click", function () { showStep(2); });
+  goStep4.addEventListener("click", function () {
+    if (!state.selectedApartment) return;
+    renderEstimateStep();
+    showStep(4);
+  });
+  backStep3.addEventListener("click", function () { showStep(3); });
+  backStep3Bottom.addEventListener("click", function () { showStep(3); });
   rotateButton.addEventListener("click", rotateSelected);
   resetSizeButton.addEventListener("click", resetSelectedSize);
   autoPlaceButton.addEventListener("click", autoPlace);
   clearBoardButton.addEventListener("click", clearBoard);
+  jobSelect.addEventListener("change", runEstimate);
+  saveEstimateButton.addEventListener("click", saveEstimateImage);
 
   renderControls();
+  renderDistrictControl();
+  renderJobs();
   showUnavailable("혜성의 추천 로직과 면적 가이드가 연결되면 이곳에 실제 근거가 있는 값이 표시됩니다.");
   loadData();
+  loadJobs();
 }());

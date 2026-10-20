@@ -23,8 +23,8 @@
       <ol>
         <li class="is-current" data-step-indicator="1"><span>1</span><strong>조건 고르기</strong></li>
         <li data-step-indicator="2"><span>2</span><strong>평면도 설계</strong></li>
-        <li aria-disabled="true"><span>3</span><strong>시세 비교</strong></li>
-        <li aria-disabled="true"><span>4</span><strong>견적서</strong></li>
+        <li data-step-indicator="3"><span>3</span><strong>시세 비교</strong></li>
+        <li data-step-indicator="4"><span>4</span><strong>견적서</strong></li>
       </ol>
     </nav>
 
@@ -124,6 +124,104 @@
           <ul class="check-list" id="check-list"></ul>
           <p class="fine-print">이 검사는 격자상 인접 여부를 확인하는 설계 보조 기능입니다. 문·기둥·설비를 포함한 건축 검토 결과가 아닙니다.</p>
         </section>
+
+        <div class="step-actions">
+          <button class="primary-button" id="go-step-3" type="button">비슷한 아파트 찾기</button>
+        </div>
+      </section>
+
+      <section class="step-section" id="step-3" aria-labelledby="step-3-title" hidden>
+        <div class="section-intro board-intro">
+          <div>
+            <p class="eyebrow">Step 3</p>
+            <h1 id="step-3-title">비슷한 크기의 아파트를 찾아볼까요?</h1>
+            <p>내가 고른 전용면적에서 ±5㎡ 범위인 대전 아파트를 비교해요.</p>
+          </div>
+          <button class="text-button" id="back-step-2" type="button">← 평면도 다시 보기</button>
+        </div>
+
+        <section class="panel apartment-filter" aria-labelledby="district-title">
+          <div>
+            <p class="eyebrow">지역 선택</p>
+            <h2 id="district-title">대전 어느 구에서 찾을까요?</h2>
+          </div>
+          <div class="district-control" id="district-control" aria-label="대전 지역 선택"></div>
+          <p class="data-status" id="similar-status" role="status">아파트 데이터를 확인하고 있어요.</p>
+          <p class="fine-print">실거래 데이터에는 방 개수가 없어 전용면적과 지역만으로 비교합니다.</p>
+        </section>
+
+        <section class="market-summary" id="market-summary" aria-label="검색 결과 요약" hidden>
+          <div><span>조건에 맞는 단지</span><strong id="summary-count"></strong></div>
+          <div><span>중간 매매가</span><strong id="summary-sale"></strong></div>
+          <div><span>중간 전세가</span><strong id="summary-jeonse"></strong></div>
+        </section>
+
+        <ul class="apartment-list" id="apartment-list" aria-label="비슷한 아파트 목록"></ul>
+
+        <div class="step-actions split-actions">
+          <button class="text-button" id="back-step-2-bottom" type="button">← 평면도 수정</button>
+          <button class="primary-button" id="go-step-4" type="button" disabled>선택한 아파트로 견적서 만들기</button>
+        </div>
+      </section>
+
+      <section class="step-section" id="step-4" aria-labelledby="step-4-title" hidden>
+        <div class="section-intro board-intro">
+          <div>
+            <p class="eyebrow">Step 4</p>
+            <h1 id="step-4-title">내 집 마련 견적서</h1>
+            <p>내가 만든 집과 선택한 아파트 가격을 직업별 월급 기준으로 비교해요.</p>
+          </div>
+          <button class="text-button" id="back-step-3" type="button">← 아파트 다시 고르기</button>
+        </div>
+
+        <article class="estimate-card" id="estimate-card">
+          <header class="estimate-header">
+            <div>
+              <p class="eyebrow">My Home Estimate</p>
+              <h2>나만의 집 마련 견적서</h2>
+            </div>
+            <span class="estimate-area" id="estimate-area"></span>
+          </header>
+
+          <div class="estimate-grid">
+            <section aria-labelledby="estimate-plan-title">
+              <h3 id="estimate-plan-title">내가 만든 평면도</h3>
+              <div class="estimate-plan" id="estimate-plan"></div>
+            </section>
+            <section class="chosen-apartment" aria-labelledby="chosen-apartment-title">
+              <h3 id="chosen-apartment-title">선택한 아파트</h3>
+              <strong id="estimate-apartment"></strong>
+              <p id="estimate-apartment-meta"></p>
+              <div><span>최근 매매가</span><b id="estimate-price"></b></div>
+            </section>
+          </div>
+
+          <section class="job-section" aria-labelledby="job-title">
+            <div>
+              <h3 id="job-title">어떤 일을 하고 있나요?</h3>
+              <p id="wage-source-note">공공 임금데이터의 월급을 한 푼도 쓰지 않는 단순 비교입니다.</p>
+            </div>
+            <label for="job-select">직업 선택</label>
+            <select id="job-select" disabled>
+              <option value="">직업 데이터를 준비하고 있어요</option>
+            </select>
+          </section>
+
+          <section class="estimate-result" id="estimate-result" aria-live="polite">
+            <p id="estimate-result-message">직업 데이터가 연결되면 필요한 기간을 계산합니다.</p>
+            <dl id="estimate-result-details" hidden>
+              <div><dt>월급 기준</dt><dd id="estimate-monthly"></dd></div>
+              <div><dt>필요 기간</dt><dd id="estimate-years"></dd></div>
+            </dl>
+          </section>
+
+          <p class="fine-print">실제 저축액·대출·세금·이자·생활비를 반영하지 않은 단순 비교이며, 시세와 임금의 데이터 기준일을 확인해 주세요.</p>
+        </article>
+
+        <div class="step-actions split-actions">
+          <button class="text-button" id="back-step-3-bottom" type="button">← 다른 아파트 선택</button>
+          <button class="primary-button" id="save-estimate" type="button" disabled>견적서 이미지 저장</button>
+        </div>
       </section>
     </main>
 
