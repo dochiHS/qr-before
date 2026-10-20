@@ -66,7 +66,11 @@ svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
 .piece.dragging { cursor: grabbing; }
 .piece.bad rect:first-child { stroke: var(--warn); stroke-width: 3; }
 .piece.sel rect:first-child { stroke: var(--accent); stroke-width: 3; }
-.handle { cursor: nwse-resize; }
+.edge { fill: transparent; }
+.edge.ns { cursor: ns-resize; }
+.edge.ew { cursor: ew-resize; }
+.piece.sel .edge { fill: var(--accent); opacity: .35; }
+.edge:hover { fill: var(--accent); opacity: .5; }
 .notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .notes li { padding: 8px 12px; border-radius: 8px; font-size: 14px; background: var(--warn-bg); border-left: 3px solid var(--warn); }
 .notes li.ok { background: color-mix(in srgb, var(--accent) 10%, var(--sheet)); border-left-color: var(--accent); }
@@ -106,7 +110,7 @@ svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
     </div>
     <svg id="board" role="img" aria-label="집 도면 편집판"></svg>
     <ul class="notes" id="notes"></ul>
-    <p class="foot">조각을 누르면 선택되고, "돌리기"로 가로·세로를 바꿀 수 있어요. 집 안에 놓은 조각은 오른쪽 아래 손잡이를 끌어 크기를 바꿀 수 있고, "원래 크기로"를 누르면 평수 기준 크기로 돌아갑니다. 겹치게 놓으면 원래 자리로 돌아갑니다. 공간 크기는 평수에 맞춘 예시 비율이며 실제 분양 면적과 다를 수 있어요.</p>
+    <p class="foot">조각을 누르면 선택되고, "돌리기"로 가로·세로를 바꿀 수 있어요. 집 안에 놓은 조각은 위·아래·왼쪽·오른쪽 테두리를 잡고 끌어 크기를 바꿀 수 있고, "원래 크기로"를 누르면 평수 기준 크기로 돌아갑니다. 겹치게 놓으면 원래 자리로 돌아갑니다. 공간 크기는 평수에 맞춘 예시 비율이며 실제 분양 면적과 다를 수 있어요.</p>
   </section>
 </div>
 
@@ -225,12 +229,16 @@ function draw() {
       <rect width="${p.w * PX}" height="${p.h * PX}" fill="var(${COLOR[p.id]})" stroke="var(--ink)" stroke-width="2"/>
       <text x="${p.w * PX / 2}" y="${p.h * PX / 2 - 2}" text-anchor="middle" font-size="${fs}" font-weight="700">${NAME[p.id]}</text>
       <text class="mono" x="${p.w * PX / 2}" y="${p.h * PX / 2 + fs}" text-anchor="middle" font-size="${Math.max(9, fs - 4)}">${(p.w * p.h * CELL * CELL).toFixed(1)}㎡</text>
-      ${p.x !== null ? `<rect class="handle" x="${p.w * PX - 16}" y="${p.h * PX - 16}" width="16" height="16" rx="3" fill="var(--ink)" opacity=".55"/>` : ""}
+      ${p.x !== null ? `
+      <rect class="edge ns" data-side="top" x="6" y="-5" width="${p.w * PX - 12}" height="10"/>
+      <rect class="edge ns" data-side="bottom" x="6" y="${p.h * PX - 5}" width="${p.w * PX - 12}" height="10"/>
+      <rect class="edge ew" data-side="left" x="-5" y="6" width="10" height="${p.h * PX - 12}"/>
+      <rect class="edge ew" data-side="right" x="${p.w * PX - 5}" y="6" width="10" height="${p.h * PX - 12}"/>` : ""}
     </g>`;
   });
   svg.innerHTML = g;
   svg.querySelectorAll(".piece").forEach(el => el.addEventListener("pointerdown", startDrag));
-  svg.querySelectorAll(".handle").forEach(el => el.addEventListener("pointerdown", startResize));
+  svg.querySelectorAll(".edge").forEach(el => el.addEventListener("pointerdown", startResize));
   document.getElementById("rotate").disabled = S.sel === null;
   document.getElementById("resetSize").disabled = S.sel === null;
   check();
@@ -280,11 +288,12 @@ function overlaps(i, x, y, w, h) {
 }
 
 let rs = null;
+// 테두리를 잡고 끌면 그쪽 면만 칸 단위로 움직인다 (위·왼쪽은 위치도 같이 바뀜)
 function startResize(e) {
   e.stopPropagation();
-  const g = e.currentTarget.parentNode, i = +g.dataset.i;
+  const g = e.currentTarget.parentNode, i = +g.dataset.i, p = S.pieces[i];
   S.sel = i;
-  rs = { g, i, rect: g.querySelector("rect") };
+  rs = { g, i, side: e.currentTarget.dataset.side, rect: g.querySelector("rect"), x: p.x, y: p.y, w: p.w, h: p.h };
   e.currentTarget.setPointerCapture(e.pointerId);
   e.currentTarget.addEventListener("pointermove", moveResize);
   e.currentTarget.addEventListener("pointerup", endResize, { once: true });
@@ -292,17 +301,22 @@ function startResize(e) {
 function moveResize(e) {
   if (!rs) return;
   const p = S.pieces[rs.i], pt = svgPoint(e);
-  const w = Math.max(2, Math.round((pt.x / PX) - (M + p.x)));
-  const h = Math.max(2, Math.round((pt.y / PX) - (M + p.y)));
-  rs.w = w; rs.h = h;
-  const ok = p.x + w <= S.cols && p.y + h <= S.rows && !overlaps(rs.i, p.x, p.y, w, h);
+  const gx = Math.round(pt.x / PX) - M, gy = Math.round(pt.y / PX) - M;
+  let x = p.x, y = p.y, w = p.w, h = p.h;
+  if (rs.side === "right") w = Math.max(2, gx - p.x);
+  if (rs.side === "bottom") h = Math.max(2, gy - p.y);
+  if (rs.side === "left") { const nx = Math.min(gx, p.x + p.w - 2); w = p.x + p.w - nx; x = nx; }
+  if (rs.side === "top") { const ny = Math.min(gy, p.y + p.h - 2); h = p.y + p.h - ny; y = ny; }
+  Object.assign(rs, { x, y, w, h });
+  const ok = x >= 0 && y >= 0 && x + w <= S.cols && y + h <= S.rows && !overlaps(rs.i, x, y, w, h);
+  rs.g.setAttribute("transform", `translate(${(M + x) * PX} ${(M + y) * PX})`);
   rs.rect.setAttribute("width", w * PX); rs.rect.setAttribute("height", h * PX);
   rs.g.classList.toggle("bad", !ok);
 }
 function endResize(e) {
   e.currentTarget.removeEventListener("pointermove", moveResize);
-  const p = S.pieces[rs.i];
-  if (rs.w && p.x + rs.w <= S.cols && p.y + rs.h <= S.rows && !overlaps(rs.i, p.x, p.y, rs.w, rs.h)) { p.w = rs.w; p.h = rs.h; }
+  const p = S.pieces[rs.i], { x, y, w, h } = rs;
+  if (x >= 0 && y >= 0 && x + w <= S.cols && y + h <= S.rows && !overlaps(rs.i, x, y, w, h)) Object.assign(p, { x, y, w, h });
   rs = null;
   render();
 }
