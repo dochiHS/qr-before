@@ -1,0 +1,56 @@
+[
+  {
+    "operator": "대전광역시 서구청",
+    "type": "parking",
+    "domains": ["seogu.go.kr"],
+    "source": "https://www.seogu.go.kr",
+    "note": "기관 공식 홈페이지 도메인. 결제 페이지 인증이 아니라 참고용.",
+    "checked": true,
+    "checkedAt": "2026-10-20"
+  },
+  {
+    "operator": "대전광역시 중구청 주차관리과",
+    "type": "parking",
+    "domains": ["djjunggu.go.kr"],
+    "source": "https://www.djjunggu.go.kr",
+    "note": "기관 공식 홈페이지 도메인. 관리기관명 '대전광역시 중구청 일자리경제과'도 같은 도메인.",
+    "checked": true,
+    "checkedAt": "2026-10-20"
+  },
+  {
+    "operator": "대전광역시 중구청 일자리경제과",
+    "type": "parking",
+    "domains": ["djjunggu.go.kr"],
+    "source": "https://www.djjunggu.go.kr",
+    "note": "기관 공식 홈페이지 도메인.",
+    "checked": true,
+    "checkedAt": "2026-10-20"
+  },
+  {
+    "operator": "대전광역시 유성구청",
+    "type": "parking",
+    "domains": ["yuseong.go.kr"],
+    "source": "https://www.yuseong.go.kr",
+    "note": "기관 공식 홈페이지 도메인.",
+    "checked": true,
+    "checkedAt": "2026-10-20"
+  },
+  {
+    "operator": "대전광역시 동구청",
+    "type": "parking",
+    "domains": ["donggu.go.kr"],
+    "source": "https://www.donggu.go.kr",
+    "note": "기관 공식 홈페이지 도메인.",
+    "checked": true,
+    "checkedAt": "2026-10-20"
+  },
+  {
+    "operator": "대전광역시",
+    "type": "parking",
+    "domains": ["daejeon.go.kr"],
+    "source": "https://www.daejeon.go.kr",
+    "note": "기관 공식 홈페이지 도메인.",
+    "checked": true,
+    "checkedAt": "2026-10-20"
+  }
+]
