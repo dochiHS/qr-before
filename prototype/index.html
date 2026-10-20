@@ -64,8 +64,9 @@ svg text { font-family: var(--f-body); fill: var(--ink); pointer-events: none; }
 svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
 .piece { cursor: grab; }
 .piece.dragging { cursor: grabbing; }
-.piece.bad rect { stroke: var(--warn); stroke-width: 3; }
-.piece.sel rect { stroke: var(--accent); stroke-width: 3; }
+.piece.bad rect:first-child { stroke: var(--warn); stroke-width: 3; }
+.piece.sel rect:first-child { stroke: var(--accent); stroke-width: 3; }
+.handle { cursor: nwse-resize; }
 .notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .notes li { padding: 8px 12px; border-radius: 8px; font-size: 14px; background: var(--warn-bg); border-left: 3px solid var(--warn); }
 .notes li.ok { background: color-mix(in srgb, var(--accent) 10%, var(--sheet)); border-left-color: var(--accent); }
@@ -99,12 +100,13 @@ svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
     </div>
     <div class="tools">
       <button class="btn ghost" id="rotate" type="button" disabled>선택한 조각 돌리기</button>
+      <button class="btn ghost" id="resetSize" type="button" disabled>원래 크기로</button>
       <button class="btn ghost" id="auto" type="button">예시 배치 보기</button>
       <button class="btn ghost" id="clear" type="button">모두 대기실로</button>
     </div>
     <svg id="board" role="img" aria-label="집 도면 편집판"></svg>
     <ul class="notes" id="notes"></ul>
-    <p class="foot">조각을 누르면 선택되고, "돌리기"로 가로·세로를 바꿀 수 있어요. 겹치게 놓으면 원래 자리로 돌아갑니다. 공간 크기는 평수에 맞춘 예시 비율이며 실제 분양 면적과 다를 수 있어요.</p>
+    <p class="foot">조각을 누르면 선택되고, "돌리기"로 가로·세로를 바꿀 수 있어요. 집 안에 놓은 조각은 오른쪽 아래 손잡이를 끌어 크기를 바꿀 수 있고, "원래 크기로"를 누르면 평수 기준 크기로 돌아갑니다. 겹치게 놓으면 원래 자리로 돌아갑니다. 공간 크기는 평수에 맞춘 예시 비율이며 실제 분양 면적과 다를 수 있어요.</p>
   </section>
 </div>
 
@@ -147,12 +149,14 @@ function setup() {
     let h = Math.max(2, Math.round(cells / w));
     return { id, w, h, x: null, y: null };
   });
+  S.pieces.forEach(p => { p.w0 = p.w; p.h0 = p.h; });
   // 칸 단위 반올림으로 작아진 만큼 거실과 방1을 한 칸씩 늘려 전체의 약 78%를 채운다
   const box = S.cols * S.rows, sum = () => S.pieces.reduce((s, p) => s + p.w * p.h, 0);
   for (let guard = 0; sum() < box * 0.78 && guard < 40; guard++) {
     const p = S.pieces.find(q => q.id === (guard % 2 ? "room1" : "living"));
     if (p.w <= p.h) p.w++; else p.h++;
   }
+  S.pieces.forEach(p => { p.w0 = p.w; p.h0 = p.h; });
   S.sel = null;
   layoutTray();
 }
@@ -176,7 +180,8 @@ function render() {
   document.getElementById("reco").innerHTML = `방 ${S.rooms}개 · 화장실 ${S.baths}개면 <b>전용 ${A.area}㎡ (${(A.area / PY).toFixed(1)}평)</b>, 흔히 부르는 <b>${A.label}</b>예요. ${A.note}`;
   document.getElementById("pieceList").innerHTML = S.pieces.map(p => {
     const m2 = p.w * p.h * CELL * CELL;
-    return `<div><span class="swatch" style="background:var(${COLOR[p.id]})"></span>${NAME[p.id]} <span class="num">${(p.w * CELL).toFixed(1)}×${(p.h * CELL).toFixed(1)}m · ${m2.toFixed(1)}㎡</span></div>`;
+    const base = p.w0 * p.h0 * CELL * CELL, changed = p.w * p.h !== p.w0 * p.h0;
+    return `<div><span class="swatch" style="background:var(${COLOR[p.id]})"></span>${NAME[p.id]} <span class="num">${(p.w * CELL).toFixed(1)}×${(p.h * CELL).toFixed(1)}m · ${m2.toFixed(1)}㎡${changed ? ` (기준 ${base.toFixed(1)}㎡)` : ""}</span></div>`;
   }).join("");
   document.getElementById("dims").textContent = `${(S.cols * CELL).toFixed(1)}m × ${(S.rows * CELL).toFixed(1)}m · 칸 하나 0.5m`;
   draw();
@@ -220,11 +225,14 @@ function draw() {
       <rect width="${p.w * PX}" height="${p.h * PX}" fill="var(${COLOR[p.id]})" stroke="var(--ink)" stroke-width="2"/>
       <text x="${p.w * PX / 2}" y="${p.h * PX / 2 - 2}" text-anchor="middle" font-size="${fs}" font-weight="700">${NAME[p.id]}</text>
       <text class="mono" x="${p.w * PX / 2}" y="${p.h * PX / 2 + fs}" text-anchor="middle" font-size="${Math.max(9, fs - 4)}">${(p.w * p.h * CELL * CELL).toFixed(1)}㎡</text>
+      ${p.x !== null ? `<rect class="handle" x="${p.w * PX - 16}" y="${p.h * PX - 16}" width="16" height="16" rx="3" fill="var(--ink)" opacity=".55"/>` : ""}
     </g>`;
   });
   svg.innerHTML = g;
   svg.querySelectorAll(".piece").forEach(el => el.addEventListener("pointerdown", startDrag));
+  svg.querySelectorAll(".handle").forEach(el => el.addEventListener("pointerdown", startResize));
   document.getElementById("rotate").disabled = S.sel === null;
+  document.getElementById("resetSize").disabled = S.sel === null;
   check();
 }
 
@@ -270,6 +278,41 @@ function endDrag(e) {
 function overlaps(i, x, y, w, h) {
   return S.pieces.some((q, j) => j !== i && q.x !== null && x < q.x + q.w && q.x < x + w && y < q.y + q.h && q.y < y + h);
 }
+
+let rs = null;
+function startResize(e) {
+  e.stopPropagation();
+  const g = e.currentTarget.parentNode, i = +g.dataset.i;
+  S.sel = i;
+  rs = { g, i, rect: g.querySelector("rect") };
+  e.currentTarget.setPointerCapture(e.pointerId);
+  e.currentTarget.addEventListener("pointermove", moveResize);
+  e.currentTarget.addEventListener("pointerup", endResize, { once: true });
+}
+function moveResize(e) {
+  if (!rs) return;
+  const p = S.pieces[rs.i], pt = svgPoint(e);
+  const w = Math.max(2, Math.round((pt.x / PX) - (M + p.x)));
+  const h = Math.max(2, Math.round((pt.y / PX) - (M + p.y)));
+  rs.w = w; rs.h = h;
+  const ok = p.x + w <= S.cols && p.y + h <= S.rows && !overlaps(rs.i, p.x, p.y, w, h);
+  rs.rect.setAttribute("width", w * PX); rs.rect.setAttribute("height", h * PX);
+  rs.g.classList.toggle("bad", !ok);
+}
+function endResize(e) {
+  e.currentTarget.removeEventListener("pointermove", moveResize);
+  const p = S.pieces[rs.i];
+  if (rs.w && p.x + rs.w <= S.cols && p.y + rs.h <= S.rows && !overlaps(rs.i, p.x, p.y, rs.w, rs.h)) { p.w = rs.w; p.h = rs.h; }
+  rs = null;
+  render();
+}
+document.getElementById("resetSize").addEventListener("click", () => {
+  const p = S.pieces[S.sel]; if (!p) return;
+  const fits = (w, h) => p.x === null || (p.x + w <= S.cols && p.y + h <= S.rows && !overlaps(S.sel, p.x, p.y, w, h));
+  if (fits(p.w0, p.h0)) { p.w = p.w0; p.h = p.h0; }
+  else if (fits(p.h0, p.w0)) { p.w = p.h0; p.h = p.w0; }
+  render();
+});
 
 document.getElementById("rotate").addEventListener("click", () => {
   const p = S.pieces[S.sel]; if (!p) return;
