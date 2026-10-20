@@ -1,0 +1,347 @@
+<title>나만의 집 만들기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 도면 용지 위에 재료색 조각(마루·타일·벽지)을 끌어다 채우는 구성. 0.5m 격자 */
+:root {
+  --paper: #f5f6f2; --sheet: #ffffff; --ink: #1f2a2e; --ink-soft: #5b676b; --line: #c9cfcb; --grid: #e6e9e5;
+  --accent: #2f6f62; --accent-ink: #ffffff; --warn: #b5532a; --warn-bg: #fbeee6;
+  --living: #e6d3b3; --kitchen: #d9e2d0; --room1: #cfdcea; --room2: #dad3e8; --room3: #e9d6d6;
+  --bath: #c8dde3; --entry: #e3e1da; --hall: #fbfaf5;
+  --f-display: "Do Hyeon", "IBM Plex Sans KR", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151b1d; --sheet: #1d2427; --ink: #e8ecea; --ink-soft: #9aa6a8; --line: #364145; --grid: #263033;
+    --accent: #6fbfab; --accent-ink: #0f1a17; --warn: #f0956a; --warn-bg: #3a2419;
+    --living: #6b5a3e; --kitchen: #4f5e45; --room1: #3e5470; --room2: #54496d; --room3: #6a4747;
+    --bath: #3d5f68; --entry: #4a4840; --hall: #222a2d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151b1d; --sheet: #1d2427; --ink: #e8ecea; --ink-soft: #9aa6a8; --line: #364145; --grid: #263033;
+  --accent: #6fbfab; --accent-ink: #0f1a17; --warn: #f0956a; --warn-bg: #3a2419;
+  --living: #6b5a3e; --kitchen: #4f5e45; --room1: #3e5470; --room2: #54496d; --room3: #6a4747;
+  --bath: #3d5f68; --entry: #4a4840; --hall: #222a2d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; }
+header h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(30px, 6vw, 44px); margin: 0; letter-spacing: .5px; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--ink-soft); max-width: 62ch; }
+.panel { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 18px; align-items: start; }
+@media (max-width: 820px) { .top { grid-template-columns: minmax(0, 1fr); } }
+.step-label { font-family: var(--f-mono); font-size: 12px; letter-spacing: 1.2px; color: var(--accent); text-transform: uppercase; }
+h2 { font-family: var(--f-display); font-weight: 400; font-size: 22px; margin: 2px 0 0; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.field-name { width: 64px; color: var(--ink-soft); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; background: transparent; color: var(--ink); border: 0; padding: 7px 13px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.reco { border-left: 3px solid var(--accent); padding: 8px 12px; background: color-mix(in srgb, var(--accent) 8%, var(--sheet)); border-radius: 0 8px 8px 0; }
+.reco b, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 14px; font-size: 13px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; border: 1px solid var(--line); }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font: inherit; font-weight: 700; padding: 9px 14px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+.board-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.board-head .num { color: var(--ink-soft); font-size: 13px; }
+svg { display: block; width: 100%; height: auto; max-width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+svg text { font-family: var(--f-body); fill: var(--ink); pointer-events: none; }
+svg .mono { font-family: var(--f-mono); fill: var(--ink-soft); }
+.piece { cursor: grab; }
+.piece.dragging { cursor: grabbing; }
+.piece.bad rect { stroke: var(--warn); stroke-width: 3; }
+.piece.sel rect { stroke: var(--accent); stroke-width: 3; }
+.notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.notes li { padding: 8px 12px; border-radius: 8px; font-size: 14px; background: var(--warn-bg); border-left: 3px solid var(--warn); }
+.notes li.ok { background: color-mix(in srgb, var(--accent) 10%, var(--sheet)); border-left-color: var(--accent); }
+.foot { font-size: 12px; color: var(--ink-soft); margin: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>나만의 집 만들기</h1>
+    <p>방과 화장실 개수를 고르면 평수와 공간별 크기가 정해집니다. 아래 대기실에 있는 공간 조각을 집 테두리 안으로 끌어다 채워 보세요. 남는 칸은 복도가 되고, 아래쪽이 해가 드는 남쪽이에요.</p>
+  </header>
+
+  <div class="top">
+    <section class="panel" aria-label="조건">
+      <div><div class="step-label">Step 1</div><h2>몇 명이 살 집인가요?</h2></div>
+      <div class="row"><span class="field-name">방</span><div class="seg" id="rooms"></div></div>
+      <div class="row"><span class="field-name">화장실</span><div class="seg" id="baths"></div></div>
+      <div class="reco" id="reco"></div>
+    </section>
+    <section class="panel" aria-label="공간 크기">
+      <div><div class="step-label">공간 크기</div><h2>이 평수에 정해진 조각</h2></div>
+      <div class="pieces" id="pieceList"></div>
+      <p class="foot">조각을 다 합치면 전체의 약 80%예요. 나머지는 복도와 벽 자리로 남겨 둡니다.</p>
+    </section>
+  </div>
+
+  <section class="panel" aria-label="도면">
+    <div class="board-head">
+      <div><div class="step-label">Step 2</div><h2>끌어다 채우기</h2></div>
+      <span class="num" id="dims"></span>
+    </div>
+    <div class="tools">
+      <button class="btn ghost" id="rotate" type="button" disabled>선택한 조각 돌리기</button>
+      <button class="btn ghost" id="auto" type="button">예시 배치 보기</button>
+      <button class="btn ghost" id="clear" type="button">모두 대기실로</button>
+    </div>
+    <svg id="board" role="img" aria-label="집 도면 편집판"></svg>
+    <ul class="notes" id="notes"></ul>
+    <p class="foot">조각을 누르면 선택되고, "돌리기"로 가로·세로를 바꿀 수 있어요. 겹치게 놓으면 원래 자리로 돌아갑니다. 공간 크기는 평수에 맞춘 예시 비율이며 실제 분양 면적과 다를 수 있어요.</p>
+  </section>
+</div>
+
+<script>
+const CELL = 0.5;            // 격자 한 칸 = 0.5m
+const PX = 22;               // 화면에서 한 칸 크기
+const PY = 3.3058;
+const RECO = {
+  "1-1": { area: 33, label: "13평형 안팎", note: "1인 가구 소형 아파트 크기예요." },
+  "1-2": { area: 39, label: "16평형 안팎", note: "방 하나에 화장실 둘은 드문 구성이에요." },
+  "2-1": { area: 49, label: "20평형대 초반", note: "신혼·2인 가구가 많이 고르는 크기예요." },
+  "2-2": { area: 59, label: "24평형", note: "방 2개에 화장실 2개면 59㎡가 무난해요." },
+  "3-1": { area: 59, label: "24평형", note: "방 3개가 들어가는 가장 작은 아파트 크기예요." },
+  "3-2": { area: 84, label: "34평형 (국민평형)", note: "가장 많이 지어지는 크기로, 주택법의 국민주택규모(85㎡ 이하)에 맞춘 면적이에요." }
+};
+// 전용면적 대비 비율과 가로세로 비
+const SHARE = { living: [.24, 1.35], kitchen: [.12, 1.4], room1: [.15, 1.2], room2: [.11, 1.15], room3: [.10, 1.1], bath1: [.045, 1.4], bath2: [.04, 1.3], entry: [.035, 1.0] };
+const NAME = { living: "거실", kitchen: "주방", room1: "방1", room2: "방2", room3: "방3", bath1: "욕실1", bath2: "욕실2", entry: "현관" };
+const COLOR = { living: "--living", kitchen: "--kitchen", room1: "--room1", room2: "--room2", room3: "--room3", bath1: "--bath", bath2: "--bath", entry: "--entry" };
+
+const S = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], sel: null };
+
+function idsFor(r, b) {
+  const ids = ["living", "kitchen"];
+  for (let i = 1; i <= r; i++) ids.push("room" + i);
+  for (let i = 1; i <= b; i++) ids.push("bath" + i);
+  ids.push("entry");
+  return ids;
+}
+
+function setup() {
+  const A = RECO[S.rooms + "-" + S.baths].area;
+  const cellsTotal = A / (CELL * CELL);
+  S.cols = Math.round(Math.sqrt(cellsTotal * 1.95));
+  S.rows = Math.round(cellsTotal / S.cols);
+  S.pieces = idsFor(S.rooms, S.baths).map(id => {
+    const [share, ratio] = SHARE[id];
+    const cells = A * share / (CELL * CELL);
+    let w = Math.max(2, Math.round(Math.sqrt(cells * ratio)));
+    let h = Math.max(2, Math.round(cells / w));
+    return { id, w, h, x: null, y: null };
+  });
+  // 칸 단위 반올림으로 작아진 만큼 거실과 방1을 한 칸씩 늘려 전체의 약 78%를 채운다
+  const box = S.cols * S.rows, sum = () => S.pieces.reduce((s, p) => s + p.w * p.h, 0);
+  for (let guard = 0; sum() < box * 0.78 && guard < 40; guard++) {
+    const p = S.pieces.find(q => q.id === (guard % 2 ? "room1" : "living"));
+    if (p.w <= p.h) p.w++; else p.h++;
+  }
+  S.sel = null;
+  layoutTray();
+}
+
+// 대기실(집 아래)에 조각을 줄지어 둔다. 놓이지 않은 조각은 x,y가 null
+function layoutTray() {
+  let tx = 0, ty = 0, rowH = 0;
+  const maxW = Math.max(S.cols, 26);
+  S.pieces.forEach(p => {
+    if (p.x !== null) return;
+    if (tx + p.w > maxW) { tx = 0; ty += rowH + 1; rowH = 0; }
+    p.tx = tx; p.ty = ty; tx += p.w + 1; rowH = Math.max(rowH, p.h);
+  });
+  S.trayRows = ty + rowH;
+}
+
+function render() {
+  const A = RECO[S.rooms + "-" + S.baths];
+  seg("rooms", [1, 2, 3], S.rooms, v => { S.rooms = v; if (!RECO[v + "-" + S.baths]) S.baths = 1; setup(); render(); });
+  seg("baths", [1, 2], S.baths, v => { S.baths = v; setup(); render(); });
+  document.getElementById("reco").innerHTML = `방 ${S.rooms}개 · 화장실 ${S.baths}개면 <b>전용 ${A.area}㎡ (${(A.area / PY).toFixed(1)}평)</b>, 흔히 부르는 <b>${A.label}</b>예요. ${A.note}`;
+  document.getElementById("pieceList").innerHTML = S.pieces.map(p => {
+    const m2 = p.w * p.h * CELL * CELL;
+    return `<div><span class="swatch" style="background:var(${COLOR[p.id]})"></span>${NAME[p.id]} <span class="num">${(p.w * CELL).toFixed(1)}×${(p.h * CELL).toFixed(1)}m · ${m2.toFixed(1)}㎡</span></div>`;
+  }).join("");
+  document.getElementById("dims").textContent = `${(S.cols * CELL).toFixed(1)}m × ${(S.rows * CELL).toFixed(1)}m · 칸 하나 0.5m`;
+  draw();
+}
+
+function seg(id, values, cur, onPick) {
+  const el = document.getElementById(id);
+  el.innerHTML = "";
+  values.forEach(v => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = v; b.setAttribute("aria-pressed", String(v === cur));
+    if (id === "baths" && !RECO[S.rooms + "-" + v]) b.disabled = true;
+    b.addEventListener("click", () => onPick(v));
+    el.appendChild(b);
+  });
+}
+
+const M = 2; // 테두리 여백(칸)
+function draw() {
+  layoutTray();
+  const svg = document.getElementById("board");
+  const W = Math.max(S.cols, 26) + M * 2, H = S.rows + M * 2 + 3 + S.trayRows + 1;
+  svg.setAttribute("viewBox", `0 0 ${W * PX} ${H * PX}`);
+  let g = "";
+  // 격자와 집 테두리
+  const ox = M, oy = M;
+  g += `<rect x="${ox * PX}" y="${oy * PX}" width="${S.cols * PX}" height="${S.rows * PX}" fill="var(--hall)"/>`;
+  for (let c = 0; c <= S.cols; c++) g += `<line x1="${(ox + c) * PX}" y1="${oy * PX}" x2="${(ox + c) * PX}" y2="${(oy + S.rows) * PX}" stroke="var(--grid)"/>`;
+  for (let r = 0; r <= S.rows; r++) g += `<line x1="${ox * PX}" y1="${(oy + r) * PX}" x2="${(ox + S.cols) * PX}" y2="${(oy + r) * PX}" stroke="var(--grid)"/>`;
+  g += `<rect x="${ox * PX}" y="${oy * PX}" width="${S.cols * PX}" height="${S.rows * PX}" fill="none" stroke="var(--ink)" stroke-width="5"/>`;
+  g += `<text class="mono" x="${(ox + S.cols / 2) * PX}" y="${(oy - .6) * PX}" text-anchor="middle" font-size="12">북쪽</text>`;
+  g += `<text class="mono" x="${(ox + S.cols / 2) * PX}" y="${(oy + S.rows + 1.2) * PX}" text-anchor="middle" font-size="12">남쪽 · 해가 드는 쪽</text>`;
+  const trayY = oy + S.rows + 3;
+  g += `<text class="mono" x="${ox * PX}" y="${(trayY - .5) * PX}" font-size="12">대기실 · 여기서 끌어 올리세요</text>`;
+  // 조각
+  S.pieces.forEach((p, i) => {
+    const px = p.x !== null ? ox + p.x : ox + p.tx;
+    const py = p.y !== null ? oy + p.y : trayY + p.ty;
+    const fs = Math.min(15, Math.max(10, p.w * 3));
+    g += `<g class="piece${S.sel === i ? " sel" : ""}" data-i="${i}" transform="translate(${px * PX} ${py * PX})">
+      <rect width="${p.w * PX}" height="${p.h * PX}" fill="var(${COLOR[p.id]})" stroke="var(--ink)" stroke-width="2"/>
+      <text x="${p.w * PX / 2}" y="${p.h * PX / 2 - 2}" text-anchor="middle" font-size="${fs}" font-weight="700">${NAME[p.id]}</text>
+      <text class="mono" x="${p.w * PX / 2}" y="${p.h * PX / 2 + fs}" text-anchor="middle" font-size="${Math.max(9, fs - 4)}">${(p.w * p.h * CELL * CELL).toFixed(1)}㎡</text>
+    </g>`;
+  });
+  svg.innerHTML = g;
+  svg.querySelectorAll(".piece").forEach(el => el.addEventListener("pointerdown", startDrag));
+  document.getElementById("rotate").disabled = S.sel === null;
+  check();
+}
+
+let drag = null;
+function svgPoint(evt) {
+  const svg = document.getElementById("board");
+  const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+function startDrag(e) {
+  const el = e.currentTarget, i = +el.dataset.i;
+  S.sel = i;
+  document.querySelectorAll(".piece").forEach(n => n.classList.toggle("sel", n === el));
+  document.getElementById("rotate").disabled = false;
+  const p0 = svgPoint(e);
+  const m = el.transform.baseVal.consolidate().matrix;
+  drag = { el, i, dx: p0.x - m.e, dy: p0.y - m.f };
+  el.classList.add("dragging");
+  el.parentNode.appendChild(el);
+  el.setPointerCapture(e.pointerId);
+  el.addEventListener("pointermove", moveDrag);
+  el.addEventListener("pointerup", endDrag, { once: true });
+}
+function moveDrag(e) {
+  if (!drag) return;
+  const p = svgPoint(e);
+  drag.el.setAttribute("transform", `translate(${p.x - drag.dx} ${p.y - drag.dy})`);
+}
+function endDrag(e) {
+  const { el, i } = drag;
+  el.removeEventListener("pointermove", moveDrag);
+  const m = el.transform.baseVal.consolidate().matrix;
+  const p = S.pieces[i];
+  const gx = Math.round(m.e / PX) - M, gy = Math.round(m.f / PX) - M;
+  drag = null;
+  if (gx >= 0 && gy >= 0 && gx + p.w <= S.cols && gy + p.h <= S.rows) {
+    if (!overlaps(i, gx, gy, p.w, p.h)) { p.x = gx; p.y = gy; }
+  } else if (m.f / PX > M + S.rows + 1) {
+    p.x = null; p.y = null;  // 대기실로 되돌림
+  }
+  draw();
+}
+function overlaps(i, x, y, w, h) {
+  return S.pieces.some((q, j) => j !== i && q.x !== null && x < q.x + q.w && q.x < x + w && y < q.y + q.h && q.y < y + h);
+}
+
+document.getElementById("rotate").addEventListener("click", () => {
+  const p = S.pieces[S.sel]; if (!p) return;
+  const nw = p.h, nh = p.w;
+  if (p.x === null || (p.x + nw <= S.cols && p.y + nh <= S.rows && !overlaps(S.sel, p.x, p.y, nw, nh))) { p.w = nw; p.h = nh; draw(); render(); }
+});
+document.getElementById("clear").addEventListener("click", () => { S.pieces.forEach(p => { p.x = null; p.y = null; }); draw(); });
+document.getElementById("auto").addEventListener("click", () => { autoPlace(); draw(); });
+
+// 예시 배치: 남쪽 줄에 방2·거실·방1, 북쪽 줄에 방3·주방·욕실·현관을 왼쪽부터 채운다
+function autoPlace() {
+  S.pieces.forEach(p => { p.x = null; p.y = null; });
+  const get = id => S.pieces.find(p => p.id === id);
+  const south = ["room2", "living", "room1"].map(get).filter(Boolean);
+  const north = ["room3", "kitchen", "bath1", "bath2", "entry"].map(get).filter(Boolean);
+  let x = 0;
+  south.forEach(p => { if (x + p.w <= S.cols) { p.x = x; p.y = S.rows - p.h; x += p.w; } });
+  x = 0;
+  north.forEach(p => { if (x + p.w <= S.cols && !overlaps(S.pieces.indexOf(p), x, 0, p.w, p.h)) { p.x = x; p.y = 0; x += p.w; } });
+  // 줄에 못 들어간 조각은 빈자리를 위에서부터 찾아 넣는다 (돌려서라도)
+  S.pieces.forEach((p, i) => {
+    if (p.x !== null) return;
+    for (const [w, h] of [[p.w, p.h], [p.h, p.w]]) {
+      for (let y = 0; y + h <= S.rows && p.x === null; y++) for (let x = 0; x + w <= S.cols; x++) {
+        if (!overlaps(i, x, y, w, h)) { p.w = w; p.h = h; p.x = x; p.y = y; break; }
+      }
+      if (p.x !== null) break;
+    }
+  });
+}
+
+// 검사: 다 놓였는지, 남향 거실, 현관에서 거실·복도를 거쳐 각 공간에 닿는지
+function check() {
+  const notes = [];
+  const placed = S.pieces.filter(p => p.x !== null);
+  const left = S.pieces.length - placed.length;
+  if (left) notes.push({ t: `아직 대기실에 ${left}개 조각이 남아 있어요.` });
+  const owner = Array.from({ length: S.rows }, () => Array(S.cols).fill(null));
+  placed.forEach(p => { for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) owner[y][x] = p.id; });
+  const lv = S.pieces.find(p => p.id === "living");
+  if (lv && lv.x !== null) {
+    if (lv.y + lv.h === S.rows) notes.push({ ok: true, t: "거실이 남쪽 벽에 붙어 있어 해가 잘 들어요." });
+    else notes.push({ t: "거실이 남쪽 창에 닿지 않아요. 아래쪽으로 내려 보세요." });
+  }
+  const en = S.pieces.find(p => p.id === "entry");
+  if (en && en.x !== null && !left) {
+    // 현관에서 시작해 빈칸(복도)과 거실·주방을 통과하며 닿는 공간을 찾는다
+    const pass = id => id === null || id === "living" || id === "kitchen" || id === "entry";
+    const seen = new Set(), reached = new Set(["entry"]);
+    const q = [];
+    for (let y = en.y; y < en.y + en.h; y++) for (let x = en.x; x < en.x + en.w; x++) { q.push([x, y]); seen.add(x + "," + y); }
+    while (q.length) {
+      const [x, y] = q.shift();
+      [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx, dy]) => {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= S.cols || ny >= S.rows) return;
+        const id = owner[ny][nx];
+        if (id) reached.add(id);
+        const k = nx + "," + ny;
+        if (!seen.has(k) && pass(id)) { seen.add(k); q.push([nx, ny]); }
+      });
+    }
+    const stuck = placed.filter(p => !reached.has(p.id)).map(p => NAME[p.id]);
+    if (stuck.length) notes.push({ t: `${stuck.join(", ")}에 들어갈 길이 없어요. 거실이나 복도(빈칸)에 닿게 옮겨 보세요.` });
+    else notes.push({ ok: true, t: "현관에서 모든 공간까지 거실이나 복도로 갈 수 있어요." });
+    const empty = owner.flat().filter(v => v === null).length;
+    notes.push({ ok: true, t: `복도·벽 자리로 남은 면적 ${(empty * CELL * CELL).toFixed(1)}㎡ (${Math.round(empty / (S.cols * S.rows) * 100)}%)` });
+  }
+  document.getElementById("notes").innerHTML = notes.map(n => `<li class="${n.ok ? "ok" : ""}">${n.t}</li>`).join("");
+}
+
+setup();
+autoPlace();
+render();
+</script>
