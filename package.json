@@ -1,0 +1,10 @@
+{
+  "name": "qr-before",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QR BEFORE — 주차장 QR을 열기 전에 확인하는 큐싱 예방 웹서비스",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}
