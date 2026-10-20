@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b2a4a">
+  <meta name="description" content="주차장 정보와 QR코드 URL의 위험 징후를 확인하는 QR BEFORE">
+  <title>QR BEFORE | 찍기 전에 확인하세요</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="QR BEFORE 홈">
+      <span class="brand-mark" aria-hidden="true">QB</span>
+      <span>QR <strong>BEFORE</strong></span>
+    </a>
+    <span class="header-badge">생활 보안 서비스</span>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">주차 QR, 열기 전에 한 번 더</p>
+      <h1 id="hero-title">찍기 전에 확인하세요</h1>
+      <p class="hero-copy">QR코드의 이동 주소와 주변 공공 주차장 정보를 한 화면에서 확인해요.</p>
+      <button class="scan-button" id="scan-button" type="button">
+        <span class="scan-icon" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </span>
+        <span><strong>QR코드 스캔</strong><small>카메라로 바로 확인하기</small></span>
+      </button>
+      <p class="privacy-note">카메라 화면은 기기에만 표시되며 저장하지 않습니다.</p>
+    </section>
+
+    <section class="workspace" aria-label="QR 및 주차장 확인 도구">
+      <div class="input-panel">
+        <div class="section-heading">
+          <span class="step">01</span>
+          <div><h2>확인할 정보를 입력하세요</h2><p>편한 방법 하나를 선택하면 됩니다.</p></div>
+        </div>
+
+        <div class="method-grid">
+          <label class="upload-card" for="qr-image">
+            <span class="method-icon" aria-hidden="true">▧</span>
+            <span><strong>QR 이미지 올리기</strong><small id="file-name">사진첩 또는 저장된 이미지</small></span>
+            <input id="qr-image" type="file" accept="image/*">
+          </label>
+
+          <form class="input-card" id="url-form">
+            <label for="url-input"><strong>URL 직접 입력</strong><small>QR에 표시된 주소를 붙여 넣으세요.</small></label>
+            <div class="field-row">
+              <input id="url-input" name="url" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com" required>
+              <button type="submit">확인</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="decoded-card" id="decoded-card" hidden>
+          <span class="decoded-label">QR에서 읽은 내용</span>
+          <output id="decoded-value"></output>
+          <p id="decoded-note"></p>
+        </div>
+
+        <form class="parking-card" id="parking-form">
+          <label for="parking-input"><strong>공공 주차장 찾기</strong><small>지역명이나 목적지를 입력하세요.</small></label>
+          <div class="field-row">
+            <input id="parking-input" name="query" type="search" autocomplete="street-address" placeholder="예: 서울역, 종로구">
+            <button type="submit">검색</button>
+          </div>
+        </form>
+
+        <div class="parking-feedback" id="parking-feedback" hidden>
+          <div class="parking-feedback-heading">
+            <p id="parking-status"></p>
+            <button id="clear-facility" type="button" hidden>선택 해제</button>
+          </div>
+          <ul class="parking-results" id="parking-results"></ul>
+        </div>
+      </div>
+
+      <aside class="result-panel" aria-labelledby="result-title" aria-live="polite">
+        <div class="section-heading">
+          <span class="step">02</span>
+          <div><h2 id="result-title">분석 결과</h2><p>입력한 정보의 확인 결과가 표시됩니다.</p></div>
+        </div>
+
+        <div class="result-empty" id="result-empty">
+          <span class="shield" aria-hidden="true">✓</span>
+          <h3>아직 확인 전이에요</h3>
+          <p>QR코드를 스캔하거나 URL을 입력해 주세요.</p>
+        </div>
+
+        <div class="result-card result-unknown" id="result-card" hidden>
+          <span class="result-label" id="result-label">확인 불가</span>
+          <h3 id="result-heading">분석 엔진 연결 전</h3>
+          <p id="result-message">현재는 화면 확인용 단계입니다. URL을 열지 않았습니다.</p>
+          <ul class="result-reasons" id="result-reasons" hidden></ul>
+          <dl id="result-details"></dl>
+          <p class="reference-note" id="reference-note" hidden>운영기관 정보와 참고 도메인은 대조 자료입니다. 공식 결제 도메인이나 안전을 보장하지 않습니다.</p>
+        </div>
+
+        <div class="status-guide" aria-label="결과 상태 안내">
+          <span class="status-danger"><i></i>위험</span>
+          <span class="status-warning"><i></i>주의</span>
+          <span class="status-reference"><i></i>참고 목록과 일치</span>
+          <span class="status-unknown"><i></i>확인 불가</span>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <dialog class="camera-dialog" id="camera-dialog" aria-labelledby="camera-title">
+    <div class="camera-heading">
+      <div>
+        <p class="eyebrow">기기에서만 처리됩니다</p>
+        <h2 id="camera-title">QR코드를 화면에 맞춰 주세요</h2>
+      </div>
+      <button class="camera-close" id="camera-close" type="button" aria-label="카메라 닫기">×</button>
+    </div>
+    <div class="camera-view">
+      <video id="camera-video" playsinline muted></video>
+      <span class="camera-frame" aria-hidden="true"></span>
+    </div>
+    <p class="camera-status" id="camera-status">카메라를 준비하고 있어요.</p>
+  </dialog>
+
+  <footer>
+    <strong>QR BEFORE</strong>
+    <p>의심스러운 주소는 직접 열지 말고 공식 사이트에서 다시 확인하세요.</p>
+  </footer>
+
+  <script src="app.js"></script>
+  <script type="module" src="integration-adapter.js"></script>
+</body>
+</html>
