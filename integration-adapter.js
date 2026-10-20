@@ -29,6 +29,24 @@ var adapter = {
     });
   },
 
+  getNearbyParkingLots: function (latitude, longitude) {
+    return dataReady.then(function () {
+      if (!validCoordinate(latitude, longitude)) throw new Error("현재 위치 좌표가 올바르지 않습니다.");
+      return facilities.map(function (facility) {
+        var facilityLatitude = Number(facility.lat);
+        var facilityLongitude = Number(facility.lng);
+        if (!validCoordinate(facilityLatitude, facilityLongitude)) return null;
+        return Object.assign({}, facility, {
+          distanceKm: haversine(latitude, longitude, facilityLatitude, facilityLongitude)
+        });
+      }).filter(function (facility) {
+        return facility !== null;
+      }).sort(function (left, right) {
+        return left.distanceKm - right.distanceKm;
+      });
+    });
+  },
+
   selectFacility: function (facilityId) {
     return dataReady.then(function () {
       var facility;
@@ -43,5 +61,24 @@ var adapter = {
     });
   }
 };
+
+function validCoordinate(latitude, longitude) {
+  return Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90
+    && longitude >= -180 && longitude <= 180;
+}
+
+function haversine(latitude1, longitude1, latitude2, longitude2) {
+  var radiusKm = 6371;
+  var toRadians = Math.PI / 180;
+  var latitudeDelta = (latitude2 - latitude1) * toRadians;
+  var longitudeDelta = (longitude2 - longitude1) * toRadians;
+  var firstLatitude = latitude1 * toRadians;
+  var secondLatitude = latitude2 * toRadians;
+  var value = Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2)
+    + Math.cos(firstLatitude) * Math.cos(secondLatitude)
+    * Math.sin(longitudeDelta / 2) * Math.sin(longitudeDelta / 2);
+  return radiusKm * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
 
 window.QRBeforeApp.connectEngine(adapter);

@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b2a4a">
   <meta name="description" content="주차장 정보와 QR코드 URL의 위험 징후를 확인하는 QR BEFORE">
-  <title>QR BEFORE | 찍기 전에 확인하세요</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <title>QR BEFORE | 열기 전에 확인하세요</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,8 +23,8 @@
   <main id="top">
     <section class="hero" aria-labelledby="hero-title">
       <p class="eyebrow">주차 QR, 열기 전에 한 번 더</p>
-      <h1 id="hero-title">찍기 전에 확인하세요</h1>
-      <p class="hero-copy">QR코드의 이동 주소와 주변 공공 주차장 정보를 한 화면에서 확인해요.</p>
+      <h1 id="hero-title">열기 전에 확인하세요</h1>
+      <p class="hero-copy">QR코드 링크를 열기 전에 위험 징후와 주변 공공 주차장 정보를 확인해요.</p>
       <button class="scan-button" id="scan-button" type="button">
         <span class="scan-icon" aria-hidden="true">
           <i></i><i></i><i></i><i></i>
@@ -61,11 +64,13 @@
         </div>
 
         <form class="parking-card" id="parking-form">
-          <label for="parking-input"><strong>공공 주차장 찾기</strong><small>지역명이나 목적지를 입력하세요.</small></label>
+          <label for="parking-input"><strong>공공 주차장 찾기</strong><small>대전광역시 공공데이터에서 시설명·주소·관리기관을 검색합니다.</small></label>
           <div class="field-row">
-            <input id="parking-input" name="query" type="search" autocomplete="street-address" placeholder="예: 서울역, 종로구">
+            <input id="parking-input" name="query" type="search" autocomplete="street-address" placeholder="예: 갤러리아, 서구청">
             <button type="submit">검색</button>
+            <button class="secondary-button" id="nearby-button" type="button">내 주변 주차장</button>
           </div>
+          <p class="location-note">위치는 버튼을 누를 때만 사용하며 저장하거나 전송하지 않습니다. 거리는 실제 경로가 아닌 직선거리입니다.</p>
         </form>
 
         <div class="parking-feedback" id="parking-feedback" hidden>
@@ -74,6 +79,7 @@
             <button id="clear-facility" type="button" hidden>선택 해제</button>
           </div>
           <ul class="parking-results" id="parking-results"></ul>
+          <button class="more-button" id="parking-more" type="button" hidden>더 보기</button>
         </div>
       </div>
 
@@ -85,17 +91,25 @@
 
         <div class="result-empty" id="result-empty">
           <span class="shield" aria-hidden="true">✓</span>
-          <h3>아직 확인 전이에요</h3>
-          <p>QR코드를 스캔하거나 URL을 입력해 주세요.</p>
+          <h3 id="result-empty-heading">아직 확인 전이에요</h3>
+          <p id="result-empty-message">QR코드를 스캔하거나 URL을 입력해 주세요.</p>
         </div>
 
         <div class="result-card result-unknown" id="result-card" hidden>
           <span class="result-label" id="result-label">확인 불가</span>
           <h3 id="result-heading">분석 엔진 연결 전</h3>
           <p id="result-message">현재는 화면 확인용 단계입니다. URL을 열지 않았습니다.</p>
+          <div class="operator-warning" id="operator-warning" role="alert" hidden>
+            <span class="operator-warning-icon" aria-hidden="true">!</span>
+            <div>
+              <strong>관리기관 불일치 주의</strong>
+              <p id="operator-warning-message"></p>
+              <p class="operator-warning-guide">결제 전에 해당 주차장 관리기관에 직접 확인해 주세요.</p>
+            </div>
+          </div>
           <ul class="result-reasons" id="result-reasons" hidden></ul>
           <dl id="result-details"></dl>
-          <p class="reference-note" id="reference-note" hidden>운영기관 정보와 참고 도메인은 대조 자료입니다. 공식 결제 도메인이나 안전을 보장하지 않습니다.</p>
+          <p class="reference-note" id="reference-note" hidden>참고 도메인은 관리기관 웹사이트 비교용이며 결제 페이지 인증 정보가 아닙니다.</p>
         </div>
 
         <div class="status-guide" aria-label="결과 상태 안내">
@@ -128,6 +142,7 @@
     <p>의심스러운 주소는 직접 열지 말고 공식 사이트에서 다시 확인하세요.</p>
   </footer>
 
+  <script src="vendor/jsQR-1.4.0.js"></script>
   <script src="app.js"></script>
   <script type="module" src="integration-adapter.js"></script>
 </body>
