@@ -1,0 +1,24 @@
+{
+  "name": "QR BEFORE",
+  "short_name": "QR BEFORE",
+  "description": "QR코드 링크를 열기 전에 확인하는 생활 보안 서비스",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0b2a4a",
+  "background_color": "#f4f7fb",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
