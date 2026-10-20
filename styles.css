@@ -123,6 +123,30 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 .check-list li.is-ok { border-left-color: var(--accent); background: var(--accent-soft); }
 .check-list li.is-pending { border-left-color: var(--line); background: #f0f3f1; color: var(--ink-soft); }
 
+.match-panel { display: grid; gap: 14px; }
+.match-panel-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.view-mode { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: min(100%, 220px); }
+.view-mode button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.view-mode button:first-child { border-radius: 9px 0 0 9px; }
+.view-mode button:last-child { margin-left: -1px; border-radius: 0 9px 9px 0; }
+.view-mode button[aria-pressed="true"] { position: relative; border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 700; }
+.plan-match-list { display: grid; gap: 12px; }
+.plan-match-card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
+.plan-match-card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
+.plan-match-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.plan-match-head h3 { margin: 0; font-size: 16px; }
+.plan-match-head p { margin: 3px 0 0; color: var(--ink-soft); font-size: 12px; }
+.match-score { flex: 0 0 auto; color: var(--accent-dark); font-family: var(--mono); font-size: 22px; font-weight: 700; }
+.plan-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.plan-pair.is-overlay { grid-template-columns: minmax(0, 1fr); }
+.plan-pair figure { min-width: 0; margin: 0; }
+.plan-pair figcaption { margin-top: 5px; color: var(--ink-soft); font-size: 11px; text-align: center; }
+.plan-svg { display: block; width: 100%; min-height: 120px; border-radius: 8px; background: var(--hall); }
+.match-parts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.match-parts li { padding: 5px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-size: 11px; font-weight: 700; }
+.match-parts li.is-same { background: var(--accent-soft); color: var(--accent-dark); }
+.plan-match-card .secondary-button { width: 100%; }
+
 .apartment-filter { display: grid; gap: 14px; }
 .district-control { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .district-control button { min-height: 46px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--ink); cursor: pointer; }
@@ -152,10 +176,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 .estimate-area { padding: 7px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-dark); font-family: var(--mono); font-size: 12px; font-weight: 700; }
 .estimate-grid { display: grid; gap: 16px; }
 .estimate-grid section { min-width: 0; }
+.estimate-plan-pair { display: grid; gap: 14px; min-width: 0; }
 .estimate-grid h3, .job-section h3 { margin-bottom: 9px; font-size: 15px; }
 .estimate-plan { display: grid; min-height: 220px; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--hall); }
 .estimate-plan svg { width: 100%; min-width: 0 !important; max-height: 320px; }
 .estimate-plan .resize-edge { display: none; }
+.estimate-match-meta { margin: 6px 0 0; color: var(--ink-soft); font-size: 11px; }
 .chosen-apartment { padding: 16px; border-radius: 11px; background: var(--accent-soft); }
 .chosen-apartment > strong { display: block; font-size: 19px; }
 .chosen-apartment > p { margin: 3px 0 16px; color: var(--ink-soft); font-size: 13px; }
@@ -166,7 +192,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 .job-section { display: grid; gap: 10px; padding: 16px; border-radius: 11px; background: #f0f3f1; }
 .job-section p { margin: -5px 0 0; color: var(--ink-soft); font-size: 12px; }
 .job-section label { font-size: 12px; font-weight: 700; }
-.job-section select { width: 100%; min-height: 46px; padding: 9px 38px 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--sheet); color: var(--ink); font: inherit; }
+.income-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.income-input input { width: 100%; min-height: 46px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--sheet); color: var(--ink); font: inherit; }
+.income-input span { color: var(--ink-soft); font-size: 13px; }
 .estimate-result { padding: 16px; border-left: 4px solid var(--accent); border-radius: 0 11px 11px 0; background: var(--accent-soft); }
 .estimate-result > p { margin: 0; font-size: 17px; font-weight: 700; }
 .estimate-result dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; }
@@ -186,13 +214,15 @@ footer p { margin: 4px 0 0; }
   .tools { display: flex; flex-wrap: wrap; }
   .board-panel { padding: 20px; }
   .district-control { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .plan-match-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .market-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .apartment-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .estimate-card { padding: 28px; }
   .estimate-grid { grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr); align-items: stretch; }
+  .estimate-plan-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .job-section { grid-template-columns: 1fr minmax(260px, .7fr); align-items: center; }
   .job-section label { grid-column: 2; grid-row: 1; align-self: end; }
-  .job-section select { grid-column: 2; grid-row: 1 / span 2; align-self: end; margin-top: 22px; }
+  .income-input { grid-column: 2; grid-row: 1 / span 2; align-self: end; margin-top: 22px; }
 }
 
 @media (prefers-color-scheme: dark) {
