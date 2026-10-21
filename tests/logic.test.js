@@ -37,7 +37,11 @@ test("일치율: 시안 예시 배치(남쪽 방2·거실·방1)는 84형 도면
   assert.ok(res[0].score > 40, `1위 ${res[0].score}%`);
 });
 
-test("견적: 4억을 월 300만원으로 모으면 11년 2개월", async () => {
-  const e = await estimate({ price: 40000, monthly: 300 });
-  assert.equal(e.months, 134); assert.equal(e.text, "월급을 한 푼도 안 쓰면 11년 2개월");
+test("견적: 4억을 예상 월급 300만원으로", () => {
+  const all = estimate({ price: 40000, monthly: 300 });
+  assert.equal(all.months, 134); assert.equal(all.text, "월급을 한 푼도 안 쓰면 11년 2개월");
+  const real = estimate({ price: 40000, monthly: 300, saveRate: 0.3 });
+  assert.equal(real.perMonth, 90); assert.equal(real.months, 445); assert.equal(real.text, "월급의 30%씩 모으면 37년 1개월");
+  assert.throws(() => estimate({ price: 40000 }));
+  assert.throws(() => estimate({ price: 40000, monthly: 300, saveRate: 0 }));
 });

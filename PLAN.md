@@ -15,7 +15,7 @@
 1. 조건 고르기: 방 수(1~3), 화장실 수(1~2) → 평수가 정해지고(예: 방3·화장실2 = 전용 84㎡, 34평형) 그 평수에 맞춘 방1·방2·방3·거실·주방·욕실·현관 크기가 미터 단위로 나옴
 2. 끌어다 채우기: 대기실의 조각을 0.5m 격자 집 테두리 안으로 끌어다 놓음. 겹치면 원위치, 돌리기 가능. 놓은 조각은 위·아래·좌·우 테두리를 끌어 크기 조절(처음 크기는 평수 기준, "원래 크기로" 버튼으로 복귀). 조각 합계는 집의 약 80%라 남는 칸이 복도·벽이 됨. 다 채우면 현관에서 거실·주방·복도를 거쳐 모든 방에 갈 수 있는지, 거실이 남쪽 벽에 붙었는지 검사
 3. 비슷한 아파트: 지역(대전 5개 구) 선택 → 전용면적 ±5㎡ 아파트의 단지명, 최근 매매가·전세가, 건축년도
-4. 견적서 카드: 내 집 그림 + 대전 시세 + 직업 고르면 "월급 안 쓰고 ○년" → 이미지로 저장·공유
+4. 견적서 카드: 내 집 그림 + 닮은 대전 아파트 시세 + 예상 월급 입력·모으는 비율(기본 100%) → "월급 한 푼 안 쓰면 ○년 / 30%씩 모으면 ○년" → 이미지로 저장·공유
 
 ## 쓰는 공공데이터
 
@@ -24,7 +24,6 @@
 | 국토교통부 아파트 매매 실거래가 | Step 3 매매가, 견적서 | https://www.data.go.kr/data/15126469/openapi.do |
 | 국토교통부 아파트 전월세 실거래가 | Step 3 전세가 | https://www.data.go.kr/data/15126474/openapi.do |
 | 한국토지주택공사 주택 평면도 현황 | 기본 배치 5개의 원본 | https://www.data.go.kr/data/15037046/fileData.do |
-| 한국고용정보원 직업별 임금정보 | 견적서 "월급 몇 년" | https://www.data.go.kr/data/15122500/fileData.do |
 
 실거래가는 앱이 실행될 때 API를 부르지 않는다. 미리 받아 JSON으로 저장해 두고 화면은 그 파일만 읽는다. 키 노출, 호출 한도, 발표 중 API 장애를 한 번에 피하기 위해서다.
 
@@ -37,7 +36,6 @@
 | 실거래가 API 2종 활용신청, 대전 5개 구 최근 12개월 매매·전세 수집 | `scripts/fetch-trades.py`, `data/trades-daejeon.json` |
 | 단지별로 묶어 전용면적별 최근 매매가·전세가 정리 | `data/apartments-daejeon.json` |
 | LH 평면도로 평수별 공간 크기 비율 검증, 예시 배치 근거 | `data/area-guide.json`, `docs/templates.md`(출처) |
-| 직업별 임금 정리 (직업 30개 내외) | `data/wages.json` |
 | 추천·견적 로직 | `logic.js` (아래 규격) |
 | 로직 검사 | `tests/` |
 | 기획안 4단계 다시 쓰기, 제출 도구 입력 | 제출 도구 저장본 |
@@ -72,8 +70,8 @@ findSimilar({ area: 84, gu: '서구', limit: 10 })
 //             sale: 61000, saleDate: '2026-09', jeonse: 36000, built: 1994 }]
 // }
 
-estimate({ price: 52000, job: '응용소프트웨어 개발자' })
-// → { monthly: 380, years: 11.4, text: '월급을 한 푼도 안 쓰면 11년 5개월' }
+estimate({ price: 52000, monthly: 380, saveRate: 1 })   // 예상 월급은 사용자가 입력 (만원)
+// → { monthly: 380, months: 137, years: 11.4, text: '월급을 한 푼도 안 쓰면 11년 5개월' }
 ```
 
 평수·공간 크기 데이터 (`data/area-guide.json`) 한 건의 모양:
@@ -100,7 +98,8 @@ const mine = toRects(state.pieces, state.cols, state.rows);      // 집 안에 �
 const top3 = await matchPlans(mine, { area: 84, rooms: 3 });
 // → [{ plan: {apt, type, region, area, rooms, baths, rects, source}, score: 53, parts: [{name:'거실', same:true}, ...] }]
 const near = await findSimilar({ area: top3[0].plan.area, gu: '서구', limit: 10 });
-const quote = await estimate({ price: near.summary.medianSale, monthly: 300 });  // job 연결은 wages.json 준비 후
+const quote = estimate({ price: near.summary.medianSale, monthly: 300, saveRate: 0.3 });
+// → { months: 445, years: 37.1, perMonth: 90, text: '월급의 30%씩 모으면 37년 1개월' }  (saveRate 생략 = 100%)
 ```
 
 ## 일정
@@ -110,7 +109,7 @@ const quote = await estimate({ price: near.summary.medianSale, monthly: 300 }); 
 | 10/20 16:30~19:00 | API 신청, 실거래 수집, 평수·공간 크기표 | 시안 옮겨 화면 뼈대 |
 | 19:00~22:00 | 단지별 정리, `logic.js` 1차, LH 평면도 대조 | Step 1·2 화면, 끌어다 놓기 |
 | 22:00 | **1차 통합**: 실제 데이터로 Step 3까지 동작 | |
-| 10/21 ~11:00 | 직업 임금·견적 로직, 검사, 기획안 초안 | 견적서 카드, 모바일, manifest |
+| 10/21 ~11:00 | 견적 로직(예상 월급 입력), 검사, 기획안 초안 | 견적서 카드, 모바일, manifest |
 | 11:00~13:00 | 발표 시나리오, 기획안 제출 도구 입력 | 배포, 휴대폰 확인 |
 | 13:00~15:00 | 기능과 기획안 문장 대조 | 버그 수정 |
 | 15:00~16:00 | 발표 리허설 (같이) | |

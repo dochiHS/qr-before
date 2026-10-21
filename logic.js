@@ -134,21 +134,19 @@ export async function matchPlans(mine, { area, rooms, limit = 3, daejeonOnly = f
 }
 
 // ───── 4. 견적: 월급 몇 년 ─────
-// price: 만원, monthly: 월 실수령 또는 월 임금(만원). job 을 주면 data/wages.json 에서 찾는다(준비 중).
-export async function estimate({ price, monthly, job } = {}) {
-  let m = Number(monthly);
-  let jobInfo = null;
-  if (!m && job) {
-    try {
-      const w = await load("wages.json");
-      jobInfo = (w.items || []).find(x => x.job === job) || null;
-      m = jobInfo ? jobInfo.monthly : 0;
-    } catch { /* wages.json 이 아직 없으면 monthly 를 직접 받아야 한다 */ }
-  }
-  if (!price || !m) throw new Error("집값(price)과 월급(monthly 또는 job)이 필요해요.");
-  const months = Math.ceil(price / m);
+// price: 집값(만원), monthly: 사용자가 넣은 예상 월급(만원), saveRate: 월급 중 모으는 비율(0~1, 기본 1 = 한 푼도 안 씀)
+export function estimate({ price, monthly, saveRate = 1 } = {}) {
+  const m = Number(monthly), r = Number(saveRate);
+  if (!(price > 0) || !(m > 0)) throw new Error("집값(price)과 예상 월급(monthly)이 필요해요.");
+  if (!(r > 0 && r <= 1)) throw new Error("모으는 비율(saveRate)은 0보다 크고 1 이하여야 해요.");
+  const perMonth = m * r;
+  const months = Math.ceil(price / perMonth);
   const years = Math.round((months / 12) * 10) / 10;
   const y = Math.floor(months / 12), mo = months % 12;
-  return { monthly: m, months, years, job: jobInfo ? jobInfo.job : job || null,
-    text: `월급을 한 푼도 안 쓰면 ${y}년${mo ? ` ${mo}개월` : ""}` };
+  const span = `${y}년${mo ? ` ${mo}개월` : ""}`;
+  const pct = Math.round(r * 100);
+  return {
+    monthly: m, saveRate: r, perMonth: Math.round(perMonth), months, years,
+    text: r === 1 ? `월급을 한 푼도 안 쓰면 ${span}` : `월급의 ${pct}%씩 모으면 ${span}`
+  };
 }
