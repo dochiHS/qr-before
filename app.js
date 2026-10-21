@@ -566,17 +566,43 @@
     return false;
   }
 
+  // 예시 배치: 남쪽 줄에 방2·거실·안방(방1), 안방 욕실(욕실2)은 안방 바로 위에 붙이고
+  // 북쪽 줄에 방3·공용 욕실(욕실1)·주방·현관을 왼쪽부터 둔다. 두 욕실이 붙지 않게 한다.
   function autoPlace() {
-    var livingIndex;
-    var order;
+    var get = function (id) { return state.pieces.find(function (piece) { return piece.id === id; }); };
+    var put = function (piece, x, y) {
+      if (!piece || x < 0 || y < 0 || x + piece.w > state.cols || y + piece.h > state.rows) return false;
+      if (overlaps(state.pieces.indexOf(piece), x, y, piece.w, piece.h)) return false;
+      piece.x = x; piece.y = y; return true;
+    };
+    var cursor = 0;
+    var master;
+    var masterBath;
     state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
-    livingIndex = state.pieces.findIndex(function (piece) { return piece.id === "living"; });
-    if (livingIndex >= 0) tryPlace(livingIndex, state.rows - state.pieces[livingIndex].h);
-    order = state.pieces.map(function (piece, index) { return index; }).filter(function (index) { return index !== livingIndex; }).sort(function (left, right) {
-      return state.pieces[right].w * state.pieces[right].h - state.pieces[left].w * state.pieces[left].h;
+    ["room2", "living", "room1"].map(get).filter(Boolean).forEach(function (piece) {
+      if (put(piece, cursor, state.rows - piece.h)) cursor += piece.w;
     });
-    order.forEach(function (index) {
-      var piece = state.pieces[index];
+    master = get("room1");
+    masterBath = get("bath2");
+    if (master && masterBath && master.x !== null) {
+      if (!put(masterBath, master.x + master.w - masterBath.w, master.y - masterBath.h)) put(masterBath, master.x, master.y - masterBath.h);
+    }
+    cursor = 0;
+    ["room3", "bath1", "kitchen", "entry"].map(get).filter(Boolean).forEach(function (piece) {
+      // 집이 작으면 북쪽 줄 조각의 세로를 최대 두 칸까지 줄여서 넣는다 ("원래 크기로"로 복귀 가능)
+      var originalHeight = piece.h;
+      var height;
+      var x;
+      for (height = originalHeight; height >= Math.max(2, originalHeight - 2) && piece.x === null; height -= 1) {
+        piece.h = height;
+        for (x = cursor; x + piece.w <= state.cols; x += 1) {
+          if (put(piece, x, 0)) { cursor = x + piece.w; break; }
+        }
+      }
+      if (piece.x === null) piece.h = originalHeight;
+    });
+    // 줄에 못 들어간 조각은 기존 방식대로 빈자리를 찾는다 (돌려서라도)
+    state.pieces.forEach(function (piece, index) {
       if (piece.x !== null || tryPlace(index, null)) return;
       piece.w = piece.h0;
       piece.h = piece.w0;
@@ -588,7 +614,7 @@
     state.selected = null;
     renderPieceList();
     drawBoard();
-    selectionStatus.textContent = "공간 크기를 바꾸지 않은 예시 배치예요.";
+    selectionStatus.textContent = "안방 욕실은 안방 옆에, 공용 욕실은 복도 쪽에 둔 예시 배치예요.";
   }
 
   function addCheck(message, status) {
