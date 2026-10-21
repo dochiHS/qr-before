@@ -9,7 +9,7 @@
   var PLAN_COLORS = { living: "--living", kitchen: "--kitchen", room: "--room1", bath: "--bath", entry: "--entry" };
   var PLAN_NAMES = { living: "거실", kitchen: "주방", room: "방", bath: "욕실", entry: "현관" };
   var SVG_NS = "http://www.w3.org/2000/svg";
-  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, trayRows: 0, recommendation: null, guide: null, mineRects: [], matches: [], selectedMatch: null, viewMode: "side", gu: "서구", similar: null, selectedApartment: null, estimate: null };
+  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, trayRows: 0, recommendation: null, guide: null, mineRects: [], matches: [], selectedMatch: null, viewMode: "side", planScope: "all", gu: "서구", similar: null, selectedApartment: null, estimate: null, quotePrice: null, quoteSource: "" };
   var logicApi = null;
   var areaGuides = [];
   var recommendationRequestId = 0;
@@ -46,6 +46,7 @@
   var goStep3 = document.getElementById("go-step-3");
   var backStep2 = document.getElementById("back-step-2");
   var backStep2Bottom = document.getElementById("back-step-2-bottom");
+  var planScope = document.getElementById("plan-scope");
   var viewMode = document.getElementById("view-mode");
   var matchStatus = document.getElementById("match-status");
   var planMatchList = document.getElementById("plan-match-list");
@@ -68,7 +69,8 @@
   var estimateApartment = document.getElementById("estimate-apartment");
   var estimateApartmentMeta = document.getElementById("estimate-apartment-meta");
   var estimatePrice = document.getElementById("estimate-price");
-  var monthlyIncome = document.getElementById("monthly-income");
+  var estimatePriceLabel = document.getElementById("estimate-price-label");
+  var targetYears = document.getElementById("target-years");
   var estimateResultMessage = document.getElementById("estimate-result-message");
   var estimateResultDetails = document.getElementById("estimate-result-details");
   var estimateMonthly = document.getElementById("estimate-monthly");
@@ -99,16 +101,18 @@
     state.similar = null;
     state.selectedApartment = null;
     state.estimate = null;
+    state.quotePrice = null;
+    state.quoteSource = "";
     marketSummary.hidden = true;
     planMatchList.replaceChildren();
     apartmentList.replaceChildren();
     estimateMatchPlan.replaceChildren();
-    monthlyIncome.value = "";
-    matchStatus.textContent = "평면도를 완성하면 LH 도면과 비교해요.";
+    targetYears.value = "";
+    matchStatus.textContent = "평면도를 완성하면 실제 도면과 비교해요.";
     matchStatus.dataset.state = "";
-    planSource.textContent = "배치 일치율은 같은 칸의 공간 종류와 공간별 중심 위치를 함께 비교합니다.";
-    similarStatus.textContent = "LH 평면도를 선택하면 대전 실거래가를 찾아요.";
-    apartmentSource.textContent = "실거래 데이터에는 방 개수가 없어 선택한 LH 평면도의 전용면적 ±5㎡와 지역으로 비교합니다.";
+    planSource.textContent = "LH 주택 평면도와 대전 기존 단지 평면도를 단순화해 비교합니다.";
+    similarStatus.textContent = "실제 평면도를 선택하면 대전 실거래가를 찾아요.";
+    apartmentSource.textContent = "실거래 데이터에는 방 개수가 없어 선택한 실제 평면도의 전용면적 ±5㎡와 지역으로 비교합니다.";
     goStep4.disabled = true;
     saveEstimateButton.disabled = true;
     estimateResultDetails.hidden = true;
@@ -276,7 +280,8 @@
       var guideData = loaded[1];
       if (typeof module.recommendArea !== "function") throw new Error("recommendArea 함수가 없습니다.");
       if (typeof module.toRects !== "function" || typeof module.matchPlans !== "function") throw new Error("평면도 비교 함수가 없습니다.");
-      logicApi = { recommendArea: module.recommendArea, findSimilar: module.findSimilar, toRects: module.toRects, matchPlans: module.matchPlans, estimate: module.estimate };
+      if (typeof module.needPerMonth !== "function") throw new Error("목표 기간 계산 함수가 없습니다.");
+      logicApi = { recommendArea: module.recommendArea, findSimilar: module.findSimilar, toRects: module.toRects, matchPlans: module.matchPlans, needPerMonth: module.needPerMonth };
       areaGuides = Array.isArray(guideData) ? guideData : Array.isArray(guideData.items) ? guideData.items : [];
       if (!areaGuides.length) throw new Error("면적 가이드가 비어 있습니다.");
       updateRecommendation();
@@ -573,6 +578,8 @@
     livingIndex = state.pieces.findIndex(function (piece) { return piece.id === "living"; });
     if (livingIndex >= 0) tryPlace(livingIndex, state.rows - state.pieces[livingIndex].h);
     order = state.pieces.map(function (piece, index) { return index; }).filter(function (index) { return index !== livingIndex; }).sort(function (left, right) {
+      if (state.rooms === 3 && state.baths === 2 && state.pieces[left].id === "entry" && state.pieces[right].id.indexOf("bath") === 0) return -1;
+      if (state.rooms === 3 && state.baths === 2 && state.pieces[right].id === "entry" && state.pieces[left].id.indexOf("bath") === 0) return 1;
       return state.pieces[right].w * state.pieces[right].h - state.pieces[left].w * state.pieces[left].h;
     });
     order.forEach(function (index) {
@@ -724,11 +731,37 @@
     });
   }
 
+  function updatePlanScope() {
+    Array.prototype.forEach.call(planScope.querySelectorAll("button"), function (button) {
+      button.setAttribute("aria-pressed", String(button.dataset.scope === state.planScope));
+    });
+  }
+
+  function createSourceLink(plan) {
+    var url;
+    var link;
+    try {
+      url = new URL(String(plan.source || ""));
+    } catch (error) {
+      return null;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    link = document.createElement("a");
+    link.className = "plan-source-link";
+    link.href = url.href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "원본 평면도 페이지 열기 (" + String(plan.sourceName || "출처") + ")";
+    return link;
+  }
+
   function renderPlanMatches() {
     planMatchList.replaceChildren();
     updateViewMode();
+    updatePlanScope();
     state.matches.forEach(function (match, index) {
       var plan = match.plan || {};
+      var trade = match.trade;
       var card = document.createElement("article");
       var head = document.createElement("div");
       var titleWrap = document.createElement("div");
@@ -740,10 +773,12 @@
       var button = document.createElement("button");
       var mineFigure = document.createElement("figure");
       var planFigure = document.createElement("figure");
+      var tradeCopy = document.createElement("p");
+      var sourceLink = createSourceLink(plan);
       var caption;
       card.className = "plan-match-card" + (state.selectedMatch === match ? " is-selected" : "");
       head.className = "plan-match-head";
-      title.textContent = (index + 1) + "위 · " + String(plan.apt || "LH 평면도") + " " + String(plan.type || "");
+      title.textContent = (index + 1) + "위 · " + String(plan.apt || "실제 평면도") + " " + String(plan.type || "");
       meta.textContent = String(plan.region || "지역 정보 없음") + " · 전용 " + String(plan.area || "-") + "㎡ · 방 " + String(plan.rooms || "-") + " · 욕실 " + String(plan.baths || "-");
       score.className = "match-score";
       score.textContent = String(Number(match.score) || 0) + "%";
@@ -751,9 +786,9 @@
       head.append(titleWrap, score);
       pair.className = "plan-pair" + (state.viewMode === "overlay" ? " is-overlay" : "");
       if (state.viewMode === "overlay") {
-        planFigure.append(createPlanSvg(plan.rects, state.mineRects, "LH 평면도 위에 내 도면을 겹친 비교"));
+        planFigure.append(createPlanSvg(plan.rects, state.mineRects, "실제 평면도 위에 내 도면을 겹친 비교"));
         caption = document.createElement("figcaption");
-        caption.textContent = "색칠: LH 평면도 · 주황 점선: 내 도면";
+        caption.textContent = "색칠: 실제 평면도 · 주황 점선: 내 도면";
         planFigure.append(caption);
         pair.append(planFigure);
       } else {
@@ -761,9 +796,9 @@
         caption = document.createElement("figcaption");
         caption.textContent = "내 도면";
         mineFigure.append(caption);
-        planFigure.append(createPlanSvg(plan.rects, null, "LH 평면도"));
+        planFigure.append(createPlanSvg(plan.rects, null, "실제 평면도"));
         caption = document.createElement("figcaption");
-        caption.textContent = String(plan.apt || "LH 평면도") + " " + String(plan.type || "");
+        caption.textContent = String(plan.apt || "실제 평면도") + " " + String(plan.type || "");
         planFigure.append(caption);
         pair.append(mineFigure, planFigure);
       }
@@ -774,12 +809,20 @@
         item.textContent = String(part.name || PLAN_NAMES[part.t] || part.t) + (part.same ? " 위치 비슷함" : " 위치 다름");
         parts.append(item);
       });
+      tradeCopy.className = "match-trade";
+      if (trade) {
+        tradeCopy.textContent = "단지 실거래 · 최근 매매 " + formatPrice(trade.lastSale) + (trade.saleDate ? " (" + String(trade.saleDate) + ")" : "") + " · 1년 중앙값 " + formatPrice(trade.sale) + " · 전세 " + formatPrice(trade.jeonse);
+      } else {
+        tradeCopy.textContent = "연결된 단지 거래 정보가 없습니다. 견적서는 선택 지역·면적의 매매 중앙값을 사용합니다.";
+      }
       button.type = "button";
       button.className = "secondary-button";
       button.setAttribute("aria-pressed", String(state.selectedMatch === match));
       button.textContent = state.selectedMatch === match ? "시세 비교 기준으로 선택됨" : "이 평면도 크기로 시세 찾기";
       button.addEventListener("click", function () { selectMatch(match); });
-      card.append(head, pair, parts, button);
+      card.append(head, pair, parts, tradeCopy);
+      if (sourceLink) card.append(sourceLink);
+      card.append(button);
       planMatchList.append(card);
     });
   }
@@ -788,8 +831,10 @@
     state.selectedMatch = match;
     state.selectedApartment = null;
     state.estimate = null;
+    state.quotePrice = null;
+    state.quoteSource = "";
     renderPlanMatches();
-    planSource.textContent = "도면 출처: " + String(match.plan.sourceName || "LH 주택 평면도 현황, 공공데이터포털") + ". 일치율은 같은 공간의 겹침과 중심 위치를 함께 비교한 참고값입니다.";
+    planSource.textContent = "도면 출처: " + String(match.plan.sourceName || "출처 정보 없음") + ". 일치율은 같은 공간의 겹침과 중심 위치를 함께 비교한 참고값입니다.";
     loadSimilar();
   }
 
@@ -801,6 +846,8 @@
     state.selectedMatch = null;
     state.similar = null;
     state.selectedApartment = null;
+    state.quotePrice = null;
+    state.quoteSource = "";
     planMatchList.replaceChildren();
     apartmentList.replaceChildren();
     marketSummary.hidden = true;
@@ -813,7 +860,7 @@
     if (!state.pieces.length || placed.length !== state.pieces.length) {
       matchStatus.textContent = "모든 공간을 집 안에 배치한 뒤 비교해 주세요.";
       matchStatus.dataset.state = "error";
-      similarStatus.textContent = "LH 평면도를 선택하면 대전 실거래가를 찾아요.";
+      similarStatus.textContent = "실제 평면도를 선택하면 대전 실거래가를 찾아요.";
       return;
     }
     try {
@@ -829,22 +876,22 @@
       return;
     }
     state.mineRects = mine;
-    matchStatus.textContent = "LH 평면도와 배치를 비교하고 있어요.";
+    matchStatus.textContent = (state.planScope === "daejeon" ? "대전 아파트" : "전체") + " 평면도와 배치를 비교하고 있어요.";
     matchStatus.dataset.state = "";
-    Promise.resolve(logicApi.matchPlans(mine, { area: Number(state.recommendation.area), rooms: state.rooms, limit: 3 })).then(function (matches) {
+    Promise.resolve(logicApi.matchPlans(mine, { area: Number(state.recommendation.area), rooms: state.rooms, limit: 3, daejeonOnly: state.planScope === "daejeon" })).then(function (matches) {
       if (requestId !== matchRequestId) return;
       if (!Array.isArray(matches)) throw new Error("평면도 비교 반환값이 규격과 다릅니다.");
       state.matches = matches.filter(function (match) { return match && match.plan && Array.isArray(match.plan.rects); }).slice(0, 3);
-      if (!state.matches.length) throw new Error("조건에 맞는 LH 평면도를 찾지 못했어요.");
+      if (!state.matches.length) throw new Error("조건에 맞는 실제 평면도를 찾지 못했어요.");
       state.selectedMatch = state.matches[0];
       renderPlanMatches();
-      planSource.textContent = "도면 출처: " + String(state.selectedMatch.plan.sourceName || "LH 주택 평면도 현황, 공공데이터포털") + ". 일치율은 같은 공간의 겹침과 중심 위치를 함께 비교한 참고값입니다.";
-      matchStatus.textContent = "가장 닮은 LH 평면도 " + state.matches.length + "개를 찾았어요.";
+      planSource.textContent = "도면 출처: " + String(state.selectedMatch.plan.sourceName || "출처 정보 없음") + ". 일치율은 같은 공간의 겹침과 중심 위치를 함께 비교한 참고값입니다.";
+      matchStatus.textContent = (state.planScope === "daejeon" ? "대전 아파트에서 " : "전체 43개 도면에서 ") + "가장 닮은 " + state.matches.length + "개를 찾았어요.";
       matchStatus.dataset.state = "ready";
       loadSimilar();
     }).catch(function (error) {
       if (requestId !== matchRequestId) return;
-      matchStatus.textContent = error && error.message ? error.message : "LH 평면도를 비교하지 못했어요.";
+      matchStatus.textContent = error && error.message ? error.message : "실제 평면도를 비교하지 못했어요.";
       matchStatus.dataset.state = "error";
     });
   }
@@ -878,7 +925,42 @@
     summarySale.textContent = formatPrice(summary.medianSale);
     summaryJeonse.textContent = formatPrice(summary.medianJeonse);
     marketSummary.hidden = false;
-    apartmentSource.textContent = "비교 기준: " + (Number.isFinite(area) ? "선택한 LH 평면도 전용면적 " + area + "㎡ ±5㎡" : "선택한 LH 평면도 전용면적 ±5㎡") + " · " + state.gu + ". " + (summary.period ? "거래 기간 " + String(summary.period) + ". " : "") + "출처: " + String(summary.source || "국토교통부 아파트 매매·전월세 실거래가 공개 API") + ".";
+    apartmentSource.textContent = "비교 기준: " + (Number.isFinite(area) ? "선택한 실제 평면도 전용면적 " + area + "㎡ ±5㎡" : "선택한 실제 평면도 전용면적 ±5㎡") + " · " + state.gu + ". " + (summary.period ? "거래 기간 " + String(summary.period) + ". " : "") + "출처: " + String(summary.source || "국토교통부 아파트 매매·전월세 실거래가 공개 API") + ".";
+  }
+
+  function resolveQuote() {
+    var match = state.selectedMatch;
+    var trade = match && match.trade;
+    var tradePrice = trade && Number(trade.lastSale);
+    var summary = state.similar && state.similar.summary;
+    var medianPrice = summary && Number(summary.medianSale);
+    var area = match && match.plan && Number(match.plan.area);
+    if (Number.isFinite(tradePrice) && tradePrice > 0) {
+      return {
+        price: tradePrice,
+        label: "단지 최근 실거래가",
+        title: String(trade.apt || match.plan.apt || "선택한 단지"),
+        meta: String(trade.gu || "") + (trade.dong ? " " + String(trade.dong) : "") + " · 전용 " + String(trade.area || area || "-") + "㎡" + (trade.saleDate ? " · " + String(trade.saleDate) + " 거래" : ""),
+        source: "선택한 평면도와 연결된 단지 최근 실거래가"
+      };
+    }
+    if (Number.isFinite(medianPrice) && medianPrice > 0) {
+      return {
+        price: medianPrice,
+        label: "지역·면적 기준 매매 중앙값",
+        title: state.gu + " 비슷한 면적 아파트",
+        meta: "전용 " + String(area || "-") + "㎡ ±5㎡" + (summary.period ? " · " + String(summary.period) : ""),
+        source: state.gu + " 전용 " + String(area || "-") + "㎡ ±5㎡ 매매 중앙값"
+      };
+    }
+    return null;
+  }
+
+  function updateQuoteAvailability() {
+    var quote = resolveQuote();
+    state.quotePrice = quote ? quote.price : null;
+    state.quoteSource = quote ? quote.source : "";
+    goStep4.disabled = !quote;
   }
 
   function apartmentPrice(item) {
@@ -899,7 +981,6 @@
   function selectApartment(item) {
     state.selectedApartment = item;
     state.estimate = null;
-    goStep4.disabled = false;
     saveEstimateButton.disabled = true;
     renderApartmentList(state.similar.items);
   }
@@ -954,11 +1035,12 @@
     apartmentList.replaceChildren();
     goStep4.disabled = true;
     if (!Number.isFinite(area)) {
-      setSimilarStatus("LH 평면도를 선택하면 대전 실거래가를 찾아요.", "error");
+      setSimilarStatus("실제 평면도를 선택하면 대전 실거래가를 찾아요.", "error");
       return;
     }
     if (!logicApi || typeof logicApi.findSimilar !== "function") {
       setSimilarStatus("아파트 검색 로직과 실거래 데이터를 준비하고 있어요.", "error");
+      updateQuoteAvailability();
       return;
     }
     setSimilarStatus(state.gu + "의 전용면적 " + area + "㎡ ±5㎡ 아파트를 찾고 있어요.");
@@ -971,6 +1053,7 @@
       state.similar = { summary: result.summary || {}, items: items };
       renderMarketSummary(state.similar);
       renderApartmentList(items);
+      updateQuoteAvailability();
       if (!items.length) {
         setSimilarStatus(state.gu + "에서 조건에 맞는 아파트를 찾지 못했어요.", "error");
         return;
@@ -979,6 +1062,8 @@
       setSimilarStatus(items.length + "개 결과를 찾았어요." + (dates.length ? " 최근 매매 " + dates[dates.length - 1] + " 기준입니다." : ""), "ready");
     }).catch(function (error) {
       if (requestId !== similarRequestId) return;
+      state.similar = null;
+      updateQuoteAvailability();
       setSimilarStatus(error && error.message ? error.message : "아파트 데이터를 불러오지 못했어요.", "error");
     });
   }
@@ -1011,35 +1096,37 @@
   }
 
   function renderEstimateStep() {
-    var apartment = state.selectedApartment;
     var match = state.selectedMatch;
+    var quote = resolveQuote();
     var area = match && match.plan && Number(match.plan.area);
-    if (!apartment) return;
-    estimateArea.textContent = Number.isFinite(area) ? "LH 비교형 전용 " + area + "㎡" : "전용면적 정보 없음";
-    estimateApartment.textContent = apartment.apt ? String(apartment.apt) : "단지명 정보 없음";
-    estimateApartmentMeta.textContent = apartmentMeta(apartment) + (apartment.saleDate ? " · " + String(apartment.saleDate) + " 기준" : "");
-    estimatePrice.textContent = formatPrice(apartmentPrice(apartment));
-    monthlyIncome.value = "";
+    if (!match || !quote) return;
+    estimateArea.textContent = Number.isFinite(area) ? "비교형 전용 " + area + "㎡" : "전용면적 정보 없음";
+    estimateApartment.textContent = quote.title;
+    estimateApartmentMeta.textContent = quote.meta;
+    estimatePriceLabel.textContent = quote.label;
+    estimatePrice.textContent = formatPrice(quote.price);
+    targetYears.value = "";
+    state.quotePrice = quote.price;
+    state.quoteSource = quote.source;
     renderFloorplanPreview();
-    estimateMatchPlan.replaceChildren(createPlanSvg(match.plan.rects, null, "가장 닮은 LH 평면도"));
-    estimateMatchMeta.textContent = String(match.plan.apt || "LH 평면도") + " " + String(match.plan.type || "") + " · 일치율 " + String(Number(match.score) || 0) + "% · " + String(match.plan.sourceName || "LH 주택 평면도 현황");
-    resetEstimateResult("월급을 입력하면 필요한 기간을 계산해요.");
+    estimateMatchPlan.replaceChildren(createPlanSvg(match.plan.rects, null, "선택한 실제 평면도"));
+    estimateMatchMeta.textContent = String(match.plan.apt || "실제 평면도") + " " + String(match.plan.type || "") + " · 일치율 " + String(Number(match.score) || 0) + "% · " + String(match.plan.sourceName || "출처 정보 없음");
+    resetEstimateResult("몇 년 안에 사고 싶은지 입력해 주세요.");
   }
 
   function runEstimate() {
     var requestId;
-    var price;
-    var monthly = Number(monthlyIncome.value);
-    if (!Number.isFinite(monthly) || monthly <= 0) {
-      resetEstimateResult(monthlyIncome.value ? "월급은 0보다 큰 숫자로 입력해 주세요." : "월급을 입력하면 필요한 기간을 계산해요.");
+    var price = Number(state.quotePrice);
+    var years = Number(targetYears.value);
+    if (!Number.isFinite(years) || years <= 0 || years > 99) {
+      resetEstimateResult(targetYears.value ? "목표 기간은 1년부터 99년 사이로 입력해 주세요." : "몇 년 안에 사고 싶은지 입력해 주세요.");
       return;
     }
-    price = apartmentPrice(state.selectedApartment);
     if (!Number.isFinite(price) || price <= 0) {
-      resetEstimateResult("선택한 아파트의 매매가가 없어 계산할 수 없어요.");
+      resetEstimateResult("계산에 사용할 실제 가격을 찾지 못했어요.");
       return;
     }
-    if (!logicApi || typeof logicApi.estimate !== "function") {
+    if (!logicApi || typeof logicApi.needPerMonth !== "function") {
       resetEstimateResult("견적 계산 로직을 불러오지 못했어요.");
       return;
     }
@@ -1047,17 +1134,15 @@
     estimateResultMessage.textContent = "내 집 마련 기간을 계산하고 있어요.";
     estimateResultDetails.hidden = true;
     saveEstimateButton.disabled = true;
-    Promise.resolve(logicApi.estimate({ price: price, monthly: monthly })).then(function (result) {
-      var monthly;
-      var years;
+    Promise.resolve(logicApi.needPerMonth({ price: price, years: years })).then(function (result) {
+      var perMonth;
       if (requestId !== estimateRequestId) return;
-      monthly = result && Number(result.monthly);
-      years = result && Number(result.years);
-      if (!result || !Number.isFinite(monthly) || !Number.isFinite(years) || typeof result.text !== "string") throw new Error("견적 반환값이 규격과 다릅니다.");
+      perMonth = result && Number(result.perMonth);
+      if (!result || !Number.isFinite(perMonth) || typeof result.text !== "string") throw new Error("견적 반환값이 규격과 다릅니다.");
       state.estimate = result;
       estimateResultMessage.textContent = result.text;
-      estimateMonthly.textContent = formatPrice(monthly);
-      estimateYears.textContent = years.toFixed(1) + "년";
+      estimateMonthly.textContent = formatPrice(perMonth);
+      estimateYears.textContent = String(result.years) + "년";
       estimateResultDetails.hidden = false;
       saveEstimateButton.disabled = false;
     }).catch(function (error) {
@@ -1158,10 +1243,9 @@
   function saveEstimateImage() {
     var canvas;
     var context;
-    var apartment = state.selectedApartment;
     var match = state.selectedMatch;
-    var monthly = Number(monthlyIncome.value);
-    if (!apartment || !match || !state.estimate || !Number.isFinite(monthly) || monthly <= 0) return;
+    var years = Number(targetYears.value);
+    if (!match || !state.estimate || !Number.isFinite(years) || years <= 0 || !Number.isFinite(Number(state.quotePrice))) return;
     canvas = document.createElement("canvas");
     canvas.width = 1080;
     canvas.height = 1400;
@@ -1177,7 +1261,7 @@
     context.fillStyle = "#1f2a2e";
     context.font = "700 25px sans-serif";
     context.fillText("내 도면", 70, 195);
-    context.fillText("가장 닮은 LH 평면도 · " + String(Number(match.score) || 0) + "%", 560, 195);
+    context.fillText("선택한 실제 평면도 · " + String(Number(match.score) || 0) + "%", 560, 195);
     drawExportPlan(context, 70, 220, 450, 360);
     drawNormalizedExportPlan(context, match.plan.rects, 560, 220, 450, 360);
     context.fillStyle = "#1f2a2e";
@@ -1188,15 +1272,16 @@
     context.fillText(estimateApartmentMeta.textContent, 70, 715);
     context.fillStyle = "#1f2a2e";
     context.font = "700 32px sans-serif";
-    context.fillText("최근 매매가  " + estimatePrice.textContent, 70, 780);
-    context.fillText("입력 월급  " + formatPrice(monthly), 70, 835);
+    context.fillText(estimatePriceLabel.textContent + "  " + estimatePrice.textContent, 70, 780);
+    context.fillText("목표 기간  " + String(years) + "년", 70, 835);
     context.fillStyle = "#2f6f62";
     context.font = "700 40px sans-serif";
     wrapCanvasText(context, state.estimate.text, 70, 925, 940, 52);
     context.fillStyle = "#5d696c";
     context.font = "22px sans-serif";
-    wrapCanvasText(context, "도면: LH 주택 평면도 현황 · 시세: 국토교통부 아파트 실거래가 공개 API", 70, 1190, 940, 30);
-    wrapCanvasText(context, "월급을 모두 저축한다고 가정한 단순 비교이며 대출·세금·생활비를 반영하지 않습니다.", 70, 1280, 940, 30);
+    wrapCanvasText(context, "가격 기준: " + state.quoteSource, 70, 1160, 940, 30);
+    wrapCanvasText(context, "도면: " + String(match.plan.sourceName || "출처 정보 없음") + " · 시세: 국토교통부 아파트 실거래가 공개 API", 70, 1220, 940, 30);
+    wrapCanvasText(context, "집값을 목표 기간의 개월 수로 나눈 단순 비교이며 대출·세금·이자·물가 변동을 반영하지 않습니다.", 70, 1300, 940, 30);
     canvas.toBlob(function (blob) {
       var url;
       var link;
@@ -1239,7 +1324,7 @@
   backStep2.addEventListener("click", function () { showStep(2); });
   backStep2Bottom.addEventListener("click", function () { showStep(2); });
   goStep4.addEventListener("click", function () {
-    if (!state.selectedApartment) return;
+    if (!resolveQuote()) return;
     renderEstimateStep();
     showStep(4);
   });
@@ -1249,13 +1334,20 @@
   resetSizeButton.addEventListener("click", resetSelectedSize);
   autoPlaceButton.addEventListener("click", autoPlace);
   clearBoardButton.addEventListener("click", clearBoard);
+  planScope.addEventListener("click", function (event) {
+    var button = event.target.closest("button[data-scope]");
+    if (!button || state.planScope === button.dataset.scope) return;
+    state.planScope = button.dataset.scope;
+    updatePlanScope();
+    runPlanMatching();
+  });
   viewMode.addEventListener("click", function (event) {
     var button = event.target.closest("button[data-view]");
     if (!button) return;
     state.viewMode = button.dataset.view;
     renderPlanMatches();
   });
-  monthlyIncome.addEventListener("input", runEstimate);
+  targetYears.addEventListener("input", runEstimate);
   saveEstimateButton.addEventListener("click", saveEstimateImage);
 
   renderControls();

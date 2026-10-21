@@ -143,27 +143,33 @@
         <section class="panel match-panel" aria-labelledby="match-title">
           <div class="match-panel-head">
             <div>
-              <p class="eyebrow">LH 평면도 비교</p>
+              <p class="eyebrow">실제 평면도 비교</p>
               <h2 id="match-title">내 도면과 닮은 집 TOP 3</h2>
             </div>
-            <div class="view-mode" id="view-mode" aria-label="평면도 비교 방식">
-              <button type="button" data-view="side" aria-pressed="true">나란히</button>
-              <button type="button" data-view="overlay" aria-pressed="false">겹쳐 보기</button>
+            <div class="match-controls">
+              <div class="view-mode" id="plan-scope" aria-label="평면도 범위">
+                <button type="button" data-scope="all" aria-pressed="true">전체 도면</button>
+                <button type="button" data-scope="daejeon" aria-pressed="false">대전 아파트만</button>
+              </div>
+              <div class="view-mode" id="view-mode" aria-label="평면도 비교 방식">
+                <button type="button" data-view="side" aria-pressed="true">나란히</button>
+                <button type="button" data-view="overlay" aria-pressed="false">겹쳐 보기</button>
+              </div>
             </div>
           </div>
-          <p class="data-status" id="match-status" role="status">LH 평면도 데이터를 확인하고 있어요.</p>
+          <p class="data-status" id="match-status" role="status">실제 평면도 데이터를 확인하고 있어요.</p>
           <div class="plan-match-list" id="plan-match-list"></div>
-          <p class="fine-print" id="plan-source">배치 일치율은 같은 칸의 공간 종류와 공간별 중심 위치를 함께 비교합니다.</p>
+          <p class="fine-print" id="plan-source">LH 주택 평면도와 대전 기존 단지 평면도를 단순화해 비교합니다.</p>
         </section>
 
         <section class="panel apartment-filter" aria-labelledby="district-title">
           <div>
             <p class="eyebrow">지역 선택</p>
-            <h2 id="district-title">선택한 LH 평면도 크기로 찾아볼까요?</h2>
+            <h2 id="district-title">선택한 실제 평면도 크기로 찾아볼까요?</h2>
           </div>
           <div class="district-control" id="district-control" aria-label="대전 지역 선택"></div>
           <p class="data-status" id="similar-status" role="status">아파트 데이터를 확인하고 있어요.</p>
-          <p class="fine-print" id="apartment-source">실거래 데이터에는 방 개수가 없어 선택한 LH 평면도의 전용면적 ±5㎡와 지역으로 비교합니다.</p>
+          <p class="fine-print" id="apartment-source">실거래 데이터에는 방 개수가 없어 선택한 실제 평면도의 전용면적 ±5㎡와 지역으로 비교합니다.</p>
         </section>
 
         <section class="market-summary" id="market-summary" aria-label="검색 결과 요약" hidden>
@@ -176,7 +182,7 @@
 
         <div class="step-actions split-actions">
           <button class="text-button" id="back-step-2-bottom" type="button">← 평면도 수정</button>
-          <button class="primary-button" id="go-step-4" type="button" disabled>선택한 아파트로 견적서 만들기</button>
+          <button class="primary-button" id="go-step-4" type="button" disabled>선택한 도면으로 견적서 만들기</button>
         </div>
       </section>
 
@@ -185,7 +191,7 @@
           <div>
             <p class="eyebrow">Step 4</p>
             <h1 id="step-4-title">내 집 마련 견적서</h1>
-            <p>내가 만든 집과 선택한 아파트 가격을 직접 입력한 월급 기준으로 비교해요.</p>
+            <p>목표 기간을 정하고 매달 얼마를 모아야 하는지 확인해요.</p>
           </div>
           <button class="text-button" id="back-step-3" type="button">← 아파트 다시 고르기</button>
         </div>
@@ -206,41 +212,41 @@
                 <div class="estimate-plan" id="estimate-plan"></div>
               </section>
               <section aria-labelledby="estimate-match-title">
-                <h3 id="estimate-match-title">가장 닮은 LH 평면도</h3>
+                <h3 id="estimate-match-title">선택한 실제 평면도</h3>
                 <div class="estimate-plan" id="estimate-match-plan"></div>
                 <p class="estimate-match-meta" id="estimate-match-meta"></p>
               </section>
             </div>
             <section class="chosen-apartment" aria-labelledby="chosen-apartment-title">
-              <h3 id="chosen-apartment-title">선택한 아파트</h3>
+              <h3 id="chosen-apartment-title">견적 가격 기준</h3>
               <strong id="estimate-apartment"></strong>
               <p id="estimate-apartment-meta"></p>
-              <div><span>최근 매매가</span><b id="estimate-price"></b></div>
+              <div><span id="estimate-price-label">계산에 사용할 가격</span><b id="estimate-price"></b></div>
             </section>
           </div>
 
-          <section class="job-section" aria-labelledby="income-title">
+          <section class="job-section" aria-labelledby="target-title">
             <div>
-              <h3 id="income-title">월급은 얼마인가요?</h3>
-              <p>월급 데이터를 직접 입력해 주세요. 임의의 직업별 임금은 사용하지 않습니다.</p>
+              <h3 id="target-title">몇 년 안에 이 집을 사고 싶어요?</h3>
+              <p>목표 기간을 입력하면 필요한 월 저축액을 계산합니다.</p>
             </div>
-            <label for="monthly-income">월급(만원)</label>
-            <div class="income-input"><input id="monthly-income" type="number" min="1" step="1" inputmode="decimal" placeholder="예: 300"><span>만원</span></div>
+            <label for="target-years">목표 기간</label>
+            <div class="income-input"><input id="target-years" type="number" min="1" max="99" step="1" inputmode="numeric" placeholder="예: 10"><span>년</span></div>
           </section>
 
           <section class="estimate-result" id="estimate-result" aria-live="polite">
-            <p id="estimate-result-message">월급을 입력하면 필요한 기간을 계산합니다.</p>
+            <p id="estimate-result-message">목표 기간을 입력하면 필요한 월 저축액을 계산합니다.</p>
             <dl id="estimate-result-details" hidden>
-              <div><dt>월급 기준</dt><dd id="estimate-monthly"></dd></div>
-              <div><dt>필요 기간</dt><dd id="estimate-years"></dd></div>
+              <div><dt>목표 기간</dt><dd id="estimate-years"></dd></div>
+              <div><dt>매달 필요한 금액</dt><dd id="estimate-monthly"></dd></div>
             </dl>
           </section>
 
-          <p class="fine-print">입력한 월급을 모두 저축한다고 가정한 단순 비교이며, 실제 저축액·대출·세금·이자·생활비를 반영하지 않습니다.</p>
+          <p class="fine-print">집값을 목표 기간의 개월 수로 단순히 나눈 값이며 대출·세금·이자·물가 변동을 반영하지 않습니다.</p>
         </article>
 
         <div class="step-actions split-actions">
-          <button class="text-button" id="back-step-3-bottom" type="button">← 다른 아파트 선택</button>
+          <button class="text-button" id="back-step-3-bottom" type="button">← 다른 도면·가격 확인</button>
           <button class="primary-button" id="save-estimate" type="button" disabled>견적서 이미지 저장</button>
         </div>
       </section>
