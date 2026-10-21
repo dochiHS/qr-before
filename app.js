@@ -351,7 +351,7 @@
           + '<rect class="resize-edge ew" data-side="right" x="' + (piece.w * PX - 8) + '" y="7" width="16" height="' + (piece.h * PX - 14) + '"/>';
       }
       markup += '<g class="piece' + selected + '" data-index="' + index + '" transform="translate(' + (pieceX * PX) + ' ' + (pieceY * PX) + ')">'
-        + '<rect class="piece-shape" width="' + (piece.w * PX) + '" height="' + (piece.h * PX) + '" fill="var(' + COLORS[piece.id] + ')" stroke="var(--ink)" stroke-width="2"/>'
+        + '<rect class="piece-shape" width="' + (piece.w * PX) + '" height="' + (piece.h * PX) + '" fill="var(' + COLORS[piece.id] + ')" stroke="var(--ink)" stroke-width="2.5"/>'
         + '<text x="' + (piece.w * PX / 2) + '" y="' + (piece.h * PX / 2 - 2) + '" text-anchor="middle" font-size="' + fontSize + '" font-weight="700">' + NAMES[piece.id] + '</text>'
         + '<text class="mono" x="' + (piece.w * PX / 2) + '" y="' + (piece.h * PX / 2 + fontSize) + '" text-anchor="middle" font-size="' + Math.max(9, fontSize - 4) + '">' + (piece.w * CELL).toFixed(1) + '×' + (piece.h * CELL).toFixed(1) + 'm</text>'
         + handles + '</g>';
@@ -712,7 +712,7 @@
       var shape;
       var text;
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
-      shape = svgNode("rect", { x: x * width, y: y * height, width: w * width, height: h * height, fill: "var(" + (PLAN_COLORS[rect.t] || "--hall") + ")", stroke: "var(--ink)", "stroke-width": 1 });
+      shape = svgNode("rect", { x: x * width, y: y * height, width: w * width, height: h * height, fill: "var(" + (PLAN_COLORS[rect.t] || "--hall") + ")", stroke: "var(--ink)", "stroke-width": 1.8 });
       svg.append(shape);
       if (w * width > 24 && h * height > 14) {
         text = svgNode("text", { x: (x + w / 2) * width, y: (y + h / 2) * height + 4, "text-anchor": "middle", "font-size": 9, fill: "var(--ink)" });
