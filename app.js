@@ -831,9 +831,11 @@
     return node;
   }
 
-  function createPlanSvg(rects, overlayRects, label) {
-    var width = 240;
-    var height = 120;
+  // aspect: 가로/세로 비율(없으면 2:1). big: 확대 보기용 큰 글씨
+  function createPlanSvg(rects, overlayRects, label, aspect, big) {
+    var width = big ? 600 : 240;
+    var height = Math.round(width / (Number(aspect) > 0 ? Math.min(2.4, Math.max(0.6, Number(aspect))) : 2));
+    var fontSize = big ? 15 : 9;
     var svg = svgNode("svg", { viewBox: "0 0 " + width + " " + height, role: "img", "aria-label": label || "평면도", class: "plan-svg" });
     svg.append(svgNode("rect", { x: 1, y: 1, width: width - 2, height: height - 2, fill: "var(--hall)", stroke: "var(--ink)", "stroke-width": 2 }));
     (Array.isArray(rects) ? rects : []).forEach(function (rect) {
@@ -846,8 +848,8 @@
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
       shape = svgNode("rect", { x: x * width, y: y * height, width: w * width, height: h * height, fill: "var(" + (PLAN_COLORS[rect.t] || "--hall") + ")", stroke: "var(--ink)", "stroke-width": 1.8 });
       svg.append(shape);
-      if (w * width > 24 && h * height > 14) {
-        text = svgNode("text", { x: (x + w / 2) * width, y: (y + h / 2) * height + 4, "text-anchor": "middle", "font-size": 9, fill: "var(--ink)" });
+      if (w * width > fontSize * 2.6 && h * height > fontSize * 1.5) {
+        text = svgNode("text", { x: (x + w / 2) * width, y: (y + h / 2) * height + fontSize * .4, "text-anchor": "middle", "font-size": fontSize, fill: "var(--ink)" });
         text.textContent = rect.n || PLAN_NAMES[rect.t] || rect.t;
         svg.append(text);
       }
@@ -858,7 +860,7 @@
       var w = Number(rect.w);
       var h = Number(rect.h);
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
-      svg.append(svgNode("rect", { x: x * width, y: y * height, width: w * width, height: h * height, fill: "none", stroke: "var(--warn)", "stroke-width": 2, "stroke-dasharray": "5 3" }));
+      svg.append(svgNode("rect", { x: x * width, y: y * height, width: w * width, height: h * height, fill: "none", stroke: "var(--warn)", "stroke-width": big ? 3 : 2, "stroke-dasharray": big ? "9 5" : "5 3" }));
     });
     return svg;
   }
@@ -893,6 +895,73 @@
     return link;
   }
 
+  function mineAspect() { return state.rows ? state.cols / state.rows : 2; }
+
+  // 비교 화면에서 도면을 누르면 크게 띄운다 (나란히 / 겹쳐 보기 전환, 원본 페이지 링크)
+  function openPlanZoom(match, index) {
+    var plan = match.plan || {};
+    var dialog = document.getElementById("plan-zoom");
+    var mode = state.viewMode === "overlay" ? "overlay" : "side";
+    var body;
+    var render;
+    if (!dialog) {
+      dialog = document.createElement("dialog");
+      dialog.id = "plan-zoom";
+      dialog.className = "plan-zoom";
+      document.body.append(dialog);
+      dialog.addEventListener("click", function (event) { if (event.target === dialog) dialog.close(); });
+    }
+    dialog.replaceChildren();
+    var head = document.createElement("div");
+    var title = document.createElement("h3");
+    var close = document.createElement("button");
+    var toggle = document.createElement("div");
+    head.className = "plan-zoom-head";
+    title.textContent = (index + 1) + "위 · " + String(plan.apt || "실제 평면도") + " " + String(plan.type || "") + " · 일치율 " + String(Number(match.score) || 0) + "%";
+    close.type = "button";
+    close.className = "plan-zoom-close";
+    close.setAttribute("aria-label", "닫기");
+    close.textContent = "×";
+    close.addEventListener("click", function () { dialog.close(); });
+    head.append(title, close);
+    toggle.className = "segmented plan-zoom-toggle";
+    [["side", "나란히"], ["overlay", "겹쳐 보기"]].forEach(function (option) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = option[1];
+      b.dataset.mode = option[0];
+      b.addEventListener("click", function () { mode = option[0]; render(); });
+      toggle.append(b);
+    });
+    body = document.createElement("div");
+    render = function () {
+      Array.prototype.forEach.call(toggle.querySelectorAll("button"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === mode)); });
+      body.replaceChildren();
+      body.className = "plan-zoom-body" + (mode === "overlay" ? " is-overlay" : "");
+      var add = function (svg, text) {
+        var figure = document.createElement("figure");
+        var caption = document.createElement("figcaption");
+        caption.textContent = text;
+        figure.append(svg, caption);
+        body.append(figure);
+      };
+      if (mode === "overlay") {
+        add(createPlanSvg(plan.rects, state.mineRects, "실제 평면도 위에 내 도면을 겹친 비교", plan.aspect, true), "색칠: " + String(plan.apt || "실제 평면도") + " · 주황 점선: 내 도면");
+      } else {
+        add(createPlanSvg(state.mineRects, null, "내가 만든 평면도", mineAspect(), true), "내 도면");
+        add(createPlanSvg(plan.rects, null, "실제 평면도", plan.aspect, true), String(plan.apt || "실제 평면도") + " " + String(plan.type || ""));
+      }
+    };
+    render();
+    var note = document.createElement("p");
+    note.className = "plan-zoom-note";
+    note.textContent = "실제 평면도는 원본 도면을 보고 방 배치만 다시 그린 그림이에요. 아래쪽이 남쪽입니다.";
+    dialog.append(head, toggle, body, note);
+    var link = createSourceLink(plan);
+    if (link) dialog.append(link);
+    dialog.showModal();
+  }
+
   function renderPlanMatches() {
     planMatchList.replaceChildren();
     updateViewMode();
@@ -924,27 +993,35 @@
       head.append(titleWrap, score);
       pair.className = "plan-pair" + (state.viewMode === "overlay" ? " is-overlay" : "");
       if (state.viewMode === "overlay") {
-        planFigure.append(createPlanSvg(plan.rects, state.mineRects, "실제 평면도 위에 내 도면을 겹친 비교"));
+        planFigure.append(createPlanSvg(plan.rects, state.mineRects, "실제 평면도 위에 내 도면을 겹친 비교", plan.aspect));
         caption = document.createElement("figcaption");
         caption.textContent = "색칠: 실제 평면도 · 주황 점선: 내 도면";
         planFigure.append(caption);
         pair.append(planFigure);
       } else {
-        mineFigure.append(createPlanSvg(state.mineRects, null, "내가 만든 평면도"));
+        mineFigure.append(createPlanSvg(state.mineRects, null, "내가 만든 평면도", mineAspect()));
         caption = document.createElement("figcaption");
         caption.textContent = "내 도면";
         mineFigure.append(caption);
-        planFigure.append(createPlanSvg(plan.rects, null, "실제 평면도"));
+        planFigure.append(createPlanSvg(plan.rects, null, "실제 평면도", plan.aspect));
         caption = document.createElement("figcaption");
         caption.textContent = String(plan.apt || "실제 평면도") + " " + String(plan.type || "");
         planFigure.append(caption);
         pair.append(mineFigure, planFigure);
       }
+      [mineFigure, planFigure].forEach(function (figure) {
+        figure.classList.add("zoomable");
+        figure.tabIndex = 0;
+        figure.setAttribute("role", "button");
+        figure.setAttribute("aria-label", "크게 보기");
+        figure.addEventListener("click", function () { openPlanZoom(match, index); });
+        figure.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPlanZoom(match, index); } });
+      });
       parts.className = "match-parts";
       (Array.isArray(match.parts) ? match.parts : []).forEach(function (part) {
         var item = document.createElement("li");
         item.className = part.same ? "is-same" : "";
-        item.textContent = String(part.name || PLAN_NAMES[part.t] || part.t) + (part.same ? " 위치 비슷함" : " 위치 다름");
+        item.textContent = String(part.name || PLAN_NAMES[part.t] || part.t) + (part.same ? " 비슷" : " 다름");
         parts.append(item);
       });
       tradeCopy.className = "match-trade";
