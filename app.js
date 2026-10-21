@@ -345,7 +345,11 @@
     markup += '<text class="mono" x="' + ((originX + state.cols / 2) * PX) + '" y="' + ((originY - .6) * PX) + '" text-anchor="middle" font-size="' + labelSize + '">북쪽</text>';
     markup += '<text class="mono" x="' + ((originX + state.cols / 2) * PX) + '" y="' + ((originY + state.rows + 1.4) * PX) + '" text-anchor="middle" font-size="' + labelSize + '">남쪽 · 해가 드는 쪽</text>';
     markup += '<text class="mono" x="' + (originX * PX) + '" y="' + ((trayY - .5) * PX) + '" font-size="' + labelSize + '">' + (isNarrow() ? '대기실 · 끌어서 집 안에 놓기' : '대기실 · 공간 조각을 집 안으로 끌어 보세요') + '</text>';
-    state.pieces.forEach(function (piece, index) {
+    // 크기 조정 중인 조각은 맨 나중에 그려 옆 조각이 테두리 손잡이를 덮지 않게 한다
+    state.pieces.map(function (piece, index) { return index; }).sort(function (left, right) {
+      return (left === state.editing) - (right === state.editing);
+    }).forEach(function (index) {
+      var piece = state.pieces[index];
       var pieceX = piece.x !== null ? originX + piece.x : originX + piece.tx;
       var pieceY = piece.y !== null ? originY + piece.y : trayY + piece.ty;
       var narrow = isNarrow();
@@ -444,10 +448,10 @@
     } else if (matrix.f / PX > MARGIN + state.rows + 1) {
       piece.x = null;
       piece.y = null;
-      moved = true;
+      moved = "tray";
     }
     drawBoard();
-    selectionStatus.textContent = moved ? NAMES[piece.id] + " 위치를 0.5m 격자에 맞췄어요." : "놓을 수 없는 위치라 이전 자리로 돌아갔어요.";
+    selectionStatus.textContent = moved === "tray" ? NAMES[piece.id] + "을 대기실로 돌려놨어요." : moved ? NAMES[piece.id] + " 위치를 0.5m 격자에 맞췄어요. 한 번 더 누르면 크기를 바꿀 수 있어요." : "놓을 수 없는 위치라 이전 자리로 돌아갔어요.";
   }
 
   function startResize(event) {
@@ -488,15 +492,24 @@
     y = piece.y;
     width = piece.w;
     height = piece.h;
-    if (resize.side === "right") width = Math.max(2, gridX - piece.x);
-    if (resize.side === "bottom") height = Math.max(2, gridY - piece.y);
+    // 집 벽을 넘지 않게 자르고, 옆 조각에 닿으면 그 앞에서 멈춘다
+    if (resize.side === "right") {
+      width = Math.min(Math.max(2, gridX - piece.x), state.cols - piece.x);
+      while (width > piece.w && overlaps(resize.index, x, y, width, height)) width -= 1;
+    }
+    if (resize.side === "bottom") {
+      height = Math.min(Math.max(2, gridY - piece.y), state.rows - piece.y);
+      while (height > piece.h && overlaps(resize.index, x, y, width, height)) height -= 1;
+    }
     if (resize.side === "left") {
-      next = Math.min(gridX, piece.x + piece.w - 2);
+      next = Math.max(0, Math.min(gridX, piece.x + piece.w - 2));
+      while (next < piece.x && overlaps(resize.index, next, y, piece.x + piece.w - next, height)) next += 1;
       width = piece.x + piece.w - next;
       x = next;
     }
     if (resize.side === "top") {
-      next = Math.min(gridY, piece.y + piece.h - 2);
+      next = Math.max(0, Math.min(gridY, piece.y + piece.h - 2));
+      while (next < piece.y && overlaps(resize.index, x, next, width, piece.y + piece.h - next)) next += 1;
       height = piece.y + piece.h - next;
       y = next;
     }
