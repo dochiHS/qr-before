@@ -101,7 +101,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 .board-head p { margin: 3px 0 0; }
 .board-dimensions { color: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
 .selection-status { color: var(--accent-dark); font-size: 13px; font-weight: 700; }
-.tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .board-scroll { overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--hall); overscroll-behavior: contain; }
 #board { display: block; width: 100%; min-width: 680px; height: auto; user-select: none; -webkit-user-select: none; touch-action: pan-x pan-y; }
 #board text { fill: var(--ink); font-family: var(--body); pointer-events: none; }

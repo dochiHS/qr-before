@@ -38,7 +38,6 @@
   var board = document.getElementById("board");
   var boardDimensions = document.getElementById("board-dimensions");
   var selectionStatus = document.getElementById("selection-status");
-  var rotateButton = document.getElementById("rotate");
   var resetSizeButton = document.getElementById("reset-size");
   var autoPlaceButton = document.getElementById("auto-place");
   var clearBoardButton = document.getElementById("clear-board");
@@ -366,7 +365,6 @@
 
   function updateToolState() {
     var piece = state.selected === null ? null : state.pieces[state.selected];
-    rotateButton.disabled = !piece;
     resetSizeButton.disabled = !piece;
     selectionStatus.textContent = piece ? NAMES[piece.id] + " 선택됨 · " + (piece.w * CELL).toFixed(1) + " × " + (piece.h * CELL).toFixed(1) + "m" : "조각을 선택해 주세요.";
   }
@@ -528,29 +526,13 @@
     selectionStatus.textContent = message;
   }
 
-  function rotateSelected() {
-    var piece = state.pieces[state.selected];
-    var nextWidth;
-    var nextHeight;
-    if (!piece) return;
-    nextWidth = piece.h;
-    nextHeight = piece.w;
-    if (fits(state.selected, piece.x, piece.y, nextWidth, nextHeight)) {
-      piece.w = nextWidth;
-      piece.h = nextHeight;
-      renderPieceList();
-      drawBoard();
-      selectionStatus.textContent = NAMES[piece.id] + "을 90도 돌렸어요.";
-    } else {
-      selectionStatus.textContent = "겹치거나 집 밖으로 나가 회전할 수 없어요.";
-    }
-  }
-
   function clearBoard() {
-    state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; });
+    // 위치와 함께 크기도 평수 기준 원래 크기로 되돌린다
+    state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
     state.selected = null;
+    renderPieceList();
     drawBoard();
-    selectionStatus.textContent = "모든 조각을 대기실로 옮겼어요.";
+    selectionStatus.textContent = "모든 조각을 원래 크기로 대기실에 돌려놨어요.";
   }
 
   function tryPlace(index, preferredY) {
@@ -1354,7 +1336,6 @@
   });
   backStep3.addEventListener("click", function () { showStep(3); });
   backStep3Bottom.addEventListener("click", function () { showStep(3); });
-  rotateButton.addEventListener("click", rotateSelected);
   resetSizeButton.addEventListener("click", resetSelectedSize);
   autoPlaceButton.addEventListener("click", autoPlace);
   clearBoardButton.addEventListener("click", clearBoard);
