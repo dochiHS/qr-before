@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { recommendArea, findSimilar, matchPlans, compareLayout, toRects, estimate } from "../logic.js";
+import { recommendArea, findSimilar, matchPlans, compareLayout, toRects, estimate, needPerMonth } from "../logic.js";
 import { readFile } from "node:fs/promises";
 
 test("추천 면적: 방3·화장실2 = 84㎡ 국민평형", () => {
@@ -37,7 +37,12 @@ test("일치율: 시안 예시 배치(남쪽 방2·거실·방1)는 84형 도면
   assert.ok(res[0].score > 40, `1위 ${res[0].score}%`);
 });
 
-test("견적: 4억을 월 300만원으로 모으면 11년 2개월", async () => {
-  const e = await estimate({ price: 40000, monthly: 300 });
-  assert.equal(e.months, 134); assert.equal(e.text, "월급을 한 푼도 안 쓰면 11년 2개월");
+test("견적: 한 달에 얼마씩 모으면 / 몇 년 안에 사려면", () => {
+  const e = estimate({ price: 40000, perMonth: 100 });
+  assert.equal(e.months, 400); assert.equal(e.text, "한 달에 100만원씩 모으면 33년 4개월");
+  assert.equal(estimate({ price: 30800, perMonth: 150 }).text, "한 달에 150만원씩 모으면 17년 2개월");
+  const n = needPerMonth({ price: 40000, years: 10 });
+  assert.equal(n.perMonth, 334); assert.equal(n.text, "10년 안에 사려면 한 달에 334만원씩");
+  assert.equal(needPerMonth({ price: 115000, years: 5 }).text, "5년 안에 사려면 한 달에 1,917만원씩");
+  assert.throws(() => estimate({ price: 40000 }));
 });

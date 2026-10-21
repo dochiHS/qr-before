@@ -111,31 +111,45 @@ export function compareLayout(mine, plan) {
 }
 
 // mine: toRects() 결과. 비슷한 면적(±16㎡) 또는 같은 방 개수인 도면 중 일치율 높은 순
-export async function matchPlans(mine, { area, rooms, limit = 3 } = {}) {
+// daejeonOnly: 대전 단지 도면만. 대전 도면은 같은 단지의 실거래가(trade)를 붙여 돌려준다.
+export async function matchPlans(mine, { area, rooms, limit = 3, daejeonOnly = false } = {}) {
   const { items } = await load("plans.json");
-  return items
-    .filter(p => !area || Math.abs(p.area - area) <= 16 || p.rooms === rooms)
+  const ranked = items
+    .filter(p => (!daejeonOnly || p.daejeon) && (!area || Math.abs(p.area - area) <= 16 || p.rooms === rooms))
     .map(p => ({ plan: p, ...compareLayout(mine, p) }))
     .sort((x, y) => y.score - x.score)
     .slice(0, limit);
+  if (ranked.some(r => r.plan.trade)) {
+    const { items: apts } = await load("apartments-daejeon.json");
+    for (const r of ranked) {
+      const t = r.plan.trade;
+      if (!t) continue;
+      const hit = apts.filter(a => a.gu === t.gu && a.apt === t.apt && Math.abs(a.area - r.plan.area) <= 3)
+        .sort((a, b) => Math.abs(a.area - r.plan.area) - Math.abs(b.area - r.plan.area))[0];
+      if (hit) r.trade = { apt: hit.apt, gu: hit.gu, dong: hit.dong, area: hit.area, built: hit.built,
+        sale: hit.sale, lastSale: hit.lastSale, saleDate: hit.lastDate, jeonse: hit.jeonse, saleCount: hit.saleCount };
+    }
+  }
+  return ranked;
 }
 
-// ───── 4. 견적: 월급 몇 년 ─────
-// price: 만원, monthly: 월 실수령 또는 월 임금(만원). job 을 주면 data/wages.json 에서 찾는다(준비 중).
-export async function estimate({ price, monthly, job } = {}) {
-  let m = Number(monthly);
-  let jobInfo = null;
-  if (!m && job) {
-    try {
-      const w = await load("wages.json");
-      jobInfo = (w.items || []).find(x => x.job === job) || null;
-      m = jobInfo ? jobInfo.monthly : 0;
-    } catch { /* wages.json 이 아직 없으면 monthly 를 직접 받아야 한다 */ }
-  }
-  if (!price || !m) throw new Error("집값(price)과 월급(monthly 또는 job)이 필요해요.");
-  const months = Math.ceil(price / m);
-  const years = Math.round((months / 12) * 10) / 10;
-  const y = Math.floor(months / 12), mo = months % 12;
-  return { monthly: m, months, years, job: jobInfo ? jobInfo.job : job || null,
-    text: `월급을 한 푼도 안 쓰면 ${y}년${mo ? ` ${mo}개월` : ""}` };
+// ───── 4. 견적: 한 달에 얼마씩 모으면 살 수 있나 ─────
+const span = months => { const y = Math.floor(months / 12), mo = months % 12; return `${y ? `${y}년` : ""}${y && mo ? " " : ""}${mo ? `${mo}개월` : ""}` || "0개월"; };
+const won = v => v >= 10000 ? `${Math.floor(v / 10000)}억${v % 10000 ? ` ${(v % 10000).toLocaleString()}만` : ""}원` : `${v.toLocaleString()}만원`;
+
+// price: 집값(만원), perMonth: 한 달에 모을 수 있는 돈(만원) → 걸리는 기간
+export function estimate({ price, perMonth } = {}) {
+  const p = Number(price), m = Number(perMonth);
+  if (!(p > 0) || !(m > 0)) throw new Error("집값(price)과 한 달에 모을 돈(perMonth)이 필요해요.");
+  const months = Math.ceil(p / m);
+  return { price: p, perMonth: m, months, years: Math.round((months / 12) * 10) / 10,
+    text: `한 달에 ${won(m)}씩 모으면 ${span(months)}` };
+}
+
+// 거꾸로: years 년 안에 사려면 한 달에 얼마씩 모아야 하나
+export function needPerMonth({ price, years } = {}) {
+  const p = Number(price), y = Number(years);
+  if (!(p > 0) || !(y > 0)) throw new Error("집값(price)과 목표 기간(years)이 필요해요.");
+  const perMonth = Math.ceil(p / (y * 12));
+  return { price: p, years: y, perMonth, text: `${y}년 안에 사려면 한 달에 ${won(perMonth)}씩` };
 }
