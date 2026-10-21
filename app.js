@@ -21,6 +21,7 @@
   var similarRequestId = 0;
   var estimateRequestId = 0;
   var drag = null;
+  state.editing = null; // 크기 조정 중인 조각 (집 안의 조각을 한 번 더 누르면 켜짐)
   var resize = null;
 
   var roomsControl = document.getElementById("rooms");
@@ -202,6 +203,7 @@
     }
     state.pieces = pieces;
     state.selected = null;
+    state.editing = null;
     layoutTray();
   }
 
@@ -350,9 +352,9 @@
       var fontSize = narrow ? Math.min(22, Math.max(14, piece.w * 3.6)) : Math.min(15, Math.max(10, piece.w * 3));
       var grip = narrow ? 30 : 16;
       var inset = narrow ? 12 : 7;
-      var selected = state.selected === index ? " selected" : "";
+      var selected = (state.selected === index ? " selected" : "") + (state.editing === index ? " editing" : "");
       var handles = "";
-      if (piece.x !== null) {
+      if (piece.x !== null && state.editing === index) {
         handles = '<rect class="resize-edge ns" data-side="top" x="' + inset + '" y="' + (-grip / 2) + '" width="' + (piece.w * PX - inset * 2) + '" height="' + grip + '"/>'
           + '<rect class="resize-edge ns" data-side="bottom" x="' + inset + '" y="' + (piece.h * PX - grip / 2) + '" width="' + (piece.w * PX - inset * 2) + '" height="' + grip + '"/>'
           + '<rect class="resize-edge ew" data-side="left" x="' + (-grip / 2) + '" y="' + inset + '" width="' + grip + '" height="' + (piece.h * PX - inset * 2) + '"/>'
@@ -373,7 +375,8 @@
 
   function updateToolState() {
     var piece = state.selected === null ? null : state.pieces[state.selected];
-    selectionStatus.textContent = piece ? NAMES[piece.id] + " 선택됨 · " + (piece.w * CELL).toFixed(1) + " × " + (piece.h * CELL).toFixed(1) + "m" : "조각을 선택해 주세요.";
+    if (piece && state.editing === state.selected) selectionStatus.textContent = NAMES[piece.id] + " 크기 조정 중 · 파란 테두리를 끌어 보세요. 다 됐으면 조각을 한 번 더 누르세요.";
+    else selectionStatus.textContent = piece ? NAMES[piece.id] + " 선택됨 · " + (piece.w * CELL).toFixed(1) + " × " + (piece.h * CELL).toFixed(1) + "m" + (piece.x !== null ? " · 한 번 더 누르면 크기 조정" : "") : "조각을 선택해 주세요.";
   }
 
   function svgPoint(event) {
@@ -389,7 +392,8 @@
     var point = svgPoint(event);
     var matrix = element.transform.baseVal.consolidate().matrix;
     state.selected = index;
-    drag = { element: element, index: index, dx: point.x - matrix.e, dy: point.y - matrix.f };
+    drag = { element: element, index: index, dx: point.x - matrix.e, dy: point.y - matrix.f, startX: event.clientX, startY: event.clientY, moved: false, wasEditing: state.editing === index };
+    if (state.editing !== null && state.editing !== index) state.editing = null;
     event.preventDefault();
     element.classList.add("dragging", "selected");
     element.parentNode.append(element);
@@ -405,6 +409,7 @@
     var point;
     if (!drag) return;
     event.preventDefault();
+    if (Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) > 6) drag.moved = true;
     point = svgPoint(event);
     drag.element.setAttribute("transform", "translate(" + (point.x - drag.dx) + " " + (point.y - drag.dy) + ")");
   }
@@ -421,8 +426,15 @@
     window.removeEventListener("pointermove", moveDrag);
     window.removeEventListener("pointerup", endDrag);
     window.removeEventListener("pointercancel", endDrag);
-    matrix = active.element.transform.baseVal.consolidate().matrix;
     piece = state.pieces[active.index];
+    if (!active.moved) {
+      // 누르기만 한 경우: 집 안의 조각이면 크기 조정 모드를 켜고 끈다
+      state.editing = piece.x !== null && !active.wasEditing ? active.index : null;
+      drawBoard();
+      return;
+    }
+    state.editing = null;
+    matrix = active.element.transform.baseVal.consolidate().matrix;
     gridX = Math.round(matrix.e / PX) - MARGIN;
     gridY = Math.round(matrix.f / PX) - MARGIN;
     if (gridX >= 0 && gridY >= 0 && gridX + piece.w <= state.cols && gridY + piece.h <= state.rows && !overlaps(active.index, gridX, gridY, piece.w, piece.h)) {
@@ -521,6 +533,7 @@
     // 위치와 함께 크기도 평수 기준 원래 크기로 되돌린다
     state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
     state.selected = null;
+    state.editing = null;
     renderPieceList();
     drawBoard();
     selectionStatus.textContent = "모든 조각을 원래 크기로 대기실에 돌려놨어요.";
@@ -590,6 +603,7 @@
       }
     });
     state.selected = null;
+    state.editing = null;
     renderPieceList();
     drawBoard();
     selectionStatus.textContent = state.baths === 2 ? "안방 욕실은 안방 옆에, 공용 욕실은 복도 쪽에 둔 예시 배치예요." : "공용 욕실을 복도 쪽에 둔 예시 배치예요.";

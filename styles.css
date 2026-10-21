@@ -119,8 +119,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--lavender); outl
 .resize-edge { fill: transparent; touch-action: none; }
 .resize-edge.ns { cursor: ns-resize; }
 .resize-edge.ew { cursor: ew-resize; }
-.piece.selected .resize-edge { fill: var(--accent); opacity: .35; }
-.resize-edge:hover { fill: var(--accent); opacity: .5; }
+.piece.editing > .piece-shape { stroke: var(--accent-dark); stroke-width: 4; stroke-dasharray: 10 6; }
+.piece.editing .resize-edge { fill: var(--accent-dark); opacity: .45; }
+.piece.editing .resize-edge:hover { opacity: .7; }
 .board-help { display: grid; gap: 4px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 9px; background: #f6f7f9; color: var(--ink-soft); font-size: 12px; }
 .board-help p { margin: 0; }
 
