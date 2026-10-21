@@ -390,18 +390,21 @@
     var matrix = element.transform.baseVal.consolidate().matrix;
     state.selected = index;
     drag = { element: element, index: index, dx: point.x - matrix.e, dy: point.y - matrix.f };
+    event.preventDefault();
     element.classList.add("dragging", "selected");
     element.parentNode.append(element);
-    element.setPointerCapture(event.pointerId);
-    element.addEventListener("pointermove", moveDrag);
-    element.addEventListener("pointerup", endDrag);
-    element.addEventListener("pointercancel", endDrag);
+    // 휴대폰에서는 끄는 도중 조각이 다시 그려지거나 스크롤이 끼어들어 이벤트를 놓치기 쉬워 창 전체에서 받는다
+    try { element.setPointerCapture(event.pointerId); } catch (error) { /* 무시 */ }
+    window.addEventListener("pointermove", moveDrag);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
     updateToolState();
   }
 
   function moveDrag(event) {
     var point;
     if (!drag) return;
+    event.preventDefault();
     point = svgPoint(event);
     drag.element.setAttribute("transform", "translate(" + (point.x - drag.dx) + " " + (point.y - drag.dy) + ")");
   }
@@ -415,9 +418,9 @@
     var moved = false;
     if (!active) return;
     drag = null;
-    active.element.removeEventListener("pointermove", moveDrag);
-    active.element.removeEventListener("pointerup", endDrag);
-    active.element.removeEventListener("pointercancel", endDrag);
+    window.removeEventListener("pointermove", moveDrag);
+    window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("pointercancel", endDrag);
     matrix = active.element.transform.baseVal.consolidate().matrix;
     piece = state.pieces[active.index];
     gridX = Math.round(matrix.e / PX) - MARGIN;
@@ -440,15 +443,16 @@
     var index;
     var piece;
     event.stopPropagation();
+    event.preventDefault();
     group = event.currentTarget.parentNode;
     index = Number(group.dataset.index);
     piece = state.pieces[index];
     state.selected = index;
     resize = { group: group, index: index, side: event.currentTarget.dataset.side, x: piece.x, y: piece.y, w: piece.w, h: piece.h };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    event.currentTarget.addEventListener("pointermove", moveResize);
-    event.currentTarget.addEventListener("pointerup", endResize);
-    event.currentTarget.addEventListener("pointercancel", endResize);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch (error) { /* 무시 */ }
+    window.addEventListener("pointermove", moveResize);
+    window.addEventListener("pointerup", endResize);
+    window.addEventListener("pointercancel", endResize);
     updateToolState();
   }
 
@@ -498,9 +502,9 @@
     var valid;
     if (!active) return;
     resize = null;
-    event.currentTarget.removeEventListener("pointermove", moveResize);
-    event.currentTarget.removeEventListener("pointerup", endResize);
-    event.currentTarget.removeEventListener("pointercancel", endResize);
+    window.removeEventListener("pointermove", moveResize);
+    window.removeEventListener("pointerup", endResize);
+    window.removeEventListener("pointercancel", endResize);
     piece = state.pieces[active.index];
     valid = active.x >= 0 && active.y >= 0 && active.x + active.w <= state.cols && active.y + active.h <= state.rows && !overlaps(active.index, active.x, active.y, active.w, active.h);
     if (valid) Object.assign(piece, { x: active.x, y: active.y, w: active.w, h: active.h });
@@ -1326,6 +1330,14 @@
   backStep3Bottom.addEventListener("click", function () { showStep(3); });
   autoPlaceButton.addEventListener("click", autoPlace);
   narrowQuery.addEventListener("change", function () { if (state.pieces.length) drawBoard(); });
+  // iOS 사파리는 SVG 조각의 touch-action 을 무시하고 화면을 스크롤해 버린다.
+  // 조각이나 테두리에서 시작한 터치만 기본 동작(스크롤·확대)을 막아 끌기가 끊기지 않게 한다.
+  board.addEventListener("touchstart", function (event) {
+    if (event.target.closest && event.target.closest(".piece")) event.preventDefault();
+  }, { passive: false });
+  board.addEventListener("touchmove", function (event) {
+    if (drag || resize) event.preventDefault();
+  }, { passive: false });
   clearBoardButton.addEventListener("click", clearBoard);
   planScope.addEventListener("click", function (event) {
     var button = event.target.closest("button[data-scope]");
