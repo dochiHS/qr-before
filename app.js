@@ -1186,7 +1186,7 @@
     var styles = getComputedStyle(document.documentElement);
     context.fillStyle = styles.getPropertyValue("--hall").trim() || "#fffefc";
     context.fillRect(left, top, planWidth, planHeight);
-    context.strokeStyle = "#e5e7eb";
+    context.strokeStyle = "#dbe1e8";
     context.lineWidth = 1;
     for (column = 0; column <= state.cols; column += 1) {
       context.beginPath();
@@ -1213,6 +1213,7 @@
       context.fillStyle = styles.getPropertyValue(COLORS[piece.id]).trim() || "#dceaf0";
       context.fillRect(pieceX, pieceY, pieceWidth, pieceHeight);
       context.strokeStyle = "#2d3137";
+      context.lineWidth = 2.5;
       context.strokeRect(pieceX, pieceY, pieceWidth, pieceHeight);
       context.fillStyle = "#2d3137";
       context.font = "700 18px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
