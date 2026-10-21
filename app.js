@@ -3,6 +3,10 @@
 
   var CELL = 0.5;
   var PX = 22;
+  // 휴대폰처럼 좁은 화면에서는 편집판을 화면 폭에 맞추고 글자·손잡이를 키운다
+  var narrowQuery = window.matchMedia("(max-width: 699px)");
+  function isNarrow() { return narrowQuery.matches; }
+  function trayWidth() { return isNarrow() ? Math.max(state.cols, 12) : Math.max(state.cols, 28); }
   var MARGIN = 2;
   var NAMES = { living: "거실", kitchen: "주방", room1: "방1", room2: "방2", room3: "방3", bath1: "욕실1", bath2: "욕실2", entry: "현관" };
   var COLORS = { living: "--living", kitchen: "--kitchen", room1: "--room1", room2: "--room2", room3: "--room3", bath1: "--bath", bath2: "--bath", entry: "--entry" };
@@ -38,7 +42,6 @@
   var board = document.getElementById("board");
   var boardDimensions = document.getElementById("board-dimensions");
   var selectionStatus = document.getElementById("selection-status");
-  var resetSizeButton = document.getElementById("reset-size");
   var autoPlaceButton = document.getElementById("auto-place");
   var clearBoardButton = document.getElementById("clear-board");
   var checkList = document.getElementById("check-list");
@@ -294,7 +297,7 @@
     var trayX = 0;
     var trayY = 0;
     var rowHeight = 0;
-    var maxWidth = Math.max(state.cols, 28);
+    var maxWidth = trayWidth();
     state.pieces.forEach(function (piece) {
       if (piece.x !== null) return;
       if (trayX + piece.w > maxWidth) {
@@ -327,33 +330,38 @@
     var row;
     if (!state.pieces.length) return;
     layoutTray();
-    width = Math.max(state.cols, 28) + MARGIN * 2;
-    height = state.rows + MARGIN * 2 + 3 + state.trayRows + 1;
-    trayY = originY + state.rows + 3;
+    width = trayWidth() + MARGIN * 2;
+    var trayGap = isNarrow() ? 4 : 3;
+    height = state.rows + MARGIN * 2 + trayGap + state.trayRows + 1;
+    trayY = originY + state.rows + trayGap;
     board.setAttribute("viewBox", "0 0 " + (width * PX) + " " + (height * PX));
     markup += '<rect x="' + (originX * PX) + '" y="' + (originY * PX) + '" width="' + (state.cols * PX) + '" height="' + (state.rows * PX) + '" fill="var(--hall)"/>';
     for (column = 0; column <= state.cols; column += 1) markup += '<line x1="' + ((originX + column) * PX) + '" y1="' + (originY * PX) + '" x2="' + ((originX + column) * PX) + '" y2="' + ((originY + state.rows) * PX) + '" stroke="var(--grid)"/>';
     for (row = 0; row <= state.rows; row += 1) markup += '<line x1="' + (originX * PX) + '" y1="' + ((originY + row) * PX) + '" x2="' + ((originX + state.cols) * PX) + '" y2="' + ((originY + row) * PX) + '" stroke="var(--grid)"/>';
     markup += '<rect x="' + (originX * PX) + '" y="' + (originY * PX) + '" width="' + (state.cols * PX) + '" height="' + (state.rows * PX) + '" fill="none" stroke="var(--ink)" stroke-width="5"/>';
-    markup += '<text class="mono" x="' + ((originX + state.cols / 2) * PX) + '" y="' + ((originY - .6) * PX) + '" text-anchor="middle" font-size="12">북쪽</text>';
-    markup += '<text class="mono" x="' + ((originX + state.cols / 2) * PX) + '" y="' + ((originY + state.rows + 1.2) * PX) + '" text-anchor="middle" font-size="12">남쪽 · 해가 드는 쪽</text>';
-    markup += '<text class="mono" x="' + (originX * PX) + '" y="' + ((trayY - .5) * PX) + '" font-size="12">대기실 · 공간 조각을 집 안으로 끌어 보세요</text>';
+    var labelSize = isNarrow() ? 17 : 12;
+    markup += '<text class="mono" x="' + ((originX + state.cols / 2) * PX) + '" y="' + ((originY - .6) * PX) + '" text-anchor="middle" font-size="' + labelSize + '">북쪽</text>';
+    markup += '<text class="mono" x="' + ((originX + state.cols / 2) * PX) + '" y="' + ((originY + state.rows + 1.4) * PX) + '" text-anchor="middle" font-size="' + labelSize + '">남쪽 · 해가 드는 쪽</text>';
+    markup += '<text class="mono" x="' + (originX * PX) + '" y="' + ((trayY - .5) * PX) + '" font-size="' + labelSize + '">' + (isNarrow() ? '대기실 · 끌어서 집 안에 놓기' : '대기실 · 공간 조각을 집 안으로 끌어 보세요') + '</text>';
     state.pieces.forEach(function (piece, index) {
       var pieceX = piece.x !== null ? originX + piece.x : originX + piece.tx;
       var pieceY = piece.y !== null ? originY + piece.y : trayY + piece.ty;
-      var fontSize = Math.min(15, Math.max(10, piece.w * 3));
+      var narrow = isNarrow();
+      var fontSize = narrow ? Math.min(22, Math.max(14, piece.w * 3.6)) : Math.min(15, Math.max(10, piece.w * 3));
+      var grip = narrow ? 30 : 16;
+      var inset = narrow ? 12 : 7;
       var selected = state.selected === index ? " selected" : "";
       var handles = "";
       if (piece.x !== null) {
-        handles = '<rect class="resize-edge ns" data-side="top" x="7" y="-8" width="' + (piece.w * PX - 14) + '" height="16"/>'
-          + '<rect class="resize-edge ns" data-side="bottom" x="7" y="' + (piece.h * PX - 8) + '" width="' + (piece.w * PX - 14) + '" height="16"/>'
-          + '<rect class="resize-edge ew" data-side="left" x="-8" y="7" width="16" height="' + (piece.h * PX - 14) + '"/>'
-          + '<rect class="resize-edge ew" data-side="right" x="' + (piece.w * PX - 8) + '" y="7" width="16" height="' + (piece.h * PX - 14) + '"/>';
+        handles = '<rect class="resize-edge ns" data-side="top" x="' + inset + '" y="' + (-grip / 2) + '" width="' + (piece.w * PX - inset * 2) + '" height="' + grip + '"/>'
+          + '<rect class="resize-edge ns" data-side="bottom" x="' + inset + '" y="' + (piece.h * PX - grip / 2) + '" width="' + (piece.w * PX - inset * 2) + '" height="' + grip + '"/>'
+          + '<rect class="resize-edge ew" data-side="left" x="' + (-grip / 2) + '" y="' + inset + '" width="' + grip + '" height="' + (piece.h * PX - inset * 2) + '"/>'
+          + '<rect class="resize-edge ew" data-side="right" x="' + (piece.w * PX - grip / 2) + '" y="' + inset + '" width="' + grip + '" height="' + (piece.h * PX - inset * 2) + '"/>';
       }
       markup += '<g class="piece' + selected + '" data-index="' + index + '" transform="translate(' + (pieceX * PX) + ' ' + (pieceY * PX) + ')">'
         + '<rect class="piece-shape" width="' + (piece.w * PX) + '" height="' + (piece.h * PX) + '" fill="var(' + COLORS[piece.id] + ')" stroke="var(--ink)" stroke-width="2.5"/>'
         + '<text x="' + (piece.w * PX / 2) + '" y="' + (piece.h * PX / 2 - 2) + '" text-anchor="middle" font-size="' + fontSize + '" font-weight="700">' + NAMES[piece.id] + '</text>'
-        + '<text class="mono" x="' + (piece.w * PX / 2) + '" y="' + (piece.h * PX / 2 + fontSize) + '" text-anchor="middle" font-size="' + Math.max(9, fontSize - 4) + '">' + (piece.w * CELL).toFixed(1) + '×' + (piece.h * CELL).toFixed(1) + 'm</text>'
+        + '<text class="mono" x="' + (piece.w * PX / 2) + '" y="' + (piece.h * PX / 2 + fontSize) + '" text-anchor="middle" font-size="' + Math.max(narrow ? 13 : 9, fontSize - (narrow ? 7 : 4)) + '">' + (piece.w * CELL).toFixed(1) + '×' + (piece.h * CELL).toFixed(1) + 'm</text>'
         + handles + '</g>';
     });
     board.innerHTML = markup;
@@ -365,7 +373,6 @@
 
   function updateToolState() {
     var piece = state.selected === null ? null : state.pieces[state.selected];
-    resetSizeButton.disabled = !piece;
     selectionStatus.textContent = piece ? NAMES[piece.id] + " 선택됨 · " + (piece.w * CELL).toFixed(1) + " × " + (piece.h * CELL).toFixed(1) + "m" : "조각을 선택해 주세요.";
   }
 
@@ -506,26 +513,6 @@
     return x === null || x >= 0 && y >= 0 && x + width <= state.cols && y + height <= state.rows && !overlaps(index, x, y, width, height);
   }
 
-  function resetSelectedSize() {
-    var piece = state.pieces[state.selected];
-    var message;
-    if (!piece) return;
-    if (fits(state.selected, piece.x, piece.y, piece.w0, piece.h0)) {
-      piece.w = piece.w0;
-      piece.h = piece.h0;
-      message = NAMES[piece.id] + " 크기를 원래대로 복원했어요.";
-    } else if (fits(state.selected, piece.x, piece.y, piece.h0, piece.w0)) {
-      piece.w = piece.h0;
-      piece.h = piece.w0;
-      message = NAMES[piece.id] + " 크기를 회전된 원래 크기로 복원했어요.";
-    } else {
-      message = "현재 자리에서는 원래 크기로 복원할 수 없어요.";
-    }
-    renderPieceList();
-    drawBoard();
-    selectionStatus.textContent = message;
-  }
-
   function clearBoard() {
     // 위치와 함께 크기도 평수 기준 원래 크기로 되돌린다
     state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
@@ -576,7 +563,7 @@
     }
     cursor = 0;
     ["room3", "bath1", "kitchen", "entry"].map(get).filter(Boolean).forEach(function (piece) {
-      // 집이 작으면 북쪽 줄 조각의 세로를 최대 두 칸까지 줄여서 넣는다 ("원래 크기로"로 복귀 가능)
+      // 집이 작으면 북쪽 줄 조각의 세로를 최대 두 칸까지 줄여서 넣는다 ("전체 초기화"로 원래 크기 복귀)
       var originalHeight = piece.h;
       var height;
       var x;
@@ -1337,8 +1324,8 @@
   });
   backStep3.addEventListener("click", function () { showStep(3); });
   backStep3Bottom.addEventListener("click", function () { showStep(3); });
-  resetSizeButton.addEventListener("click", resetSelectedSize);
   autoPlaceButton.addEventListener("click", autoPlace);
+  narrowQuery.addEventListener("change", function () { if (state.pieces.length) drawBoard(); });
   clearBoardButton.addEventListener("click", clearBoard);
   planScope.addEventListener("click", function (event) {
     var button = event.target.closest("button[data-scope]");
