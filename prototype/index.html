@@ -366,22 +366,35 @@ document.getElementById("rotate").addEventListener("click", () => {
 document.getElementById("clear").addEventListener("click", () => { S.pieces.forEach(p => { p.x = null; p.y = null; }); draw(); });
 document.getElementById("auto").addEventListener("click", () => { autoPlace(); draw(); });
 
-// 예시 배치: 남쪽 줄에 방2·거실·방1, 북쪽 줄에 방3·주방·욕실·현관을 왼쪽부터 채운다
+// 예시 배치: 남쪽 줄에 방2·거실·안방(방1), 안방 욕실(욕실2)은 안방 바로 위에 붙이고,
+// 북쪽 줄에 방3·공용 욕실(욕실1)·주방·현관을 왼쪽부터 채운다. 두 욕실이 붙지 않게 한다.
 function autoPlace() {
   S.pieces.forEach(p => { p.x = null; p.y = null; });
   const get = id => S.pieces.find(p => p.id === id);
-  const south = ["room2", "living", "room1"].map(get).filter(Boolean);
-  const north = ["room3", "kitchen", "bath1", "bath2", "entry"].map(get).filter(Boolean);
+  const put = (p, x, y) => {
+    if (!p || x < 0 || y < 0 || x + p.w > S.cols || y + p.h > S.rows || overlaps(S.pieces.indexOf(p), x, y, p.w, p.h)) return false;
+    p.x = x; p.y = y; return true;
+  };
   let x = 0;
-  south.forEach(p => { if (x + p.w <= S.cols) { p.x = x; p.y = S.rows - p.h; x += p.w; } });
+  ["room2", "living", "room1"].map(get).filter(Boolean).forEach(p => { if (put(p, x, S.rows - p.h)) x += p.w; });
+  const r1 = get("room1"), b2 = get("bath2");
+  if (r1 && b2 && r1.x !== null) put(b2, r1.x + r1.w - b2.w, r1.y - b2.h) || put(b2, r1.x, r1.y - b2.h);
   x = 0;
-  north.forEach(p => { if (x + p.w <= S.cols && !overlaps(S.pieces.indexOf(p), x, 0, p.w, p.h)) { p.x = x; p.y = 0; x += p.w; } });
+  ["room3", "bath1", "kitchen", "entry"].map(get).filter(Boolean).forEach(p => {
+    // 집이 작으면 북쪽 줄 조각의 세로를 최대 두 칸까지 줄여서라도 넣는다 ("원래 크기로"로 복귀 가능)
+    const h0 = p.h;
+    for (let h = h0; h >= Math.max(2, h0 - 2) && p.x === null; h--) {
+      p.h = h;
+      for (let xx = x; xx + p.w <= S.cols; xx++) if (put(p, xx, 0)) { x = xx + p.w; break; }
+    }
+    if (p.x === null) p.h = h0;
+  });
   // 줄에 못 들어간 조각은 빈자리를 위에서부터 찾아 넣는다 (돌려서라도)
   S.pieces.forEach((p, i) => {
     if (p.x !== null) return;
     for (const [w, h] of [[p.w, p.h], [p.h, p.w]]) {
-      for (let y = 0; y + h <= S.rows && p.x === null; y++) for (let x = 0; x + w <= S.cols; x++) {
-        if (!overlaps(i, x, y, w, h)) { p.w = w; p.h = h; p.x = x; p.y = y; break; }
+      for (let y = 0; y + h <= S.rows && p.x === null; y++) for (let xx = 0; xx + w <= S.cols; xx++) {
+        if (!overlaps(i, xx, y, w, h)) { p.w = w; p.h = h; p.x = xx; p.y = y; break; }
       }
       if (p.x !== null) break;
     }
