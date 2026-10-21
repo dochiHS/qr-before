@@ -107,14 +107,16 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--lavender); outl
 .board-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }
 .board-head p { margin: 3px 0 0; }
 .board-dimensions { color: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
-.selection-status { color: var(--accent-dark); font-size: 13px; font-weight: 700; }
+.selection-status { min-height: 3em; color: var(--accent-dark); font-size: 13px; font-weight: 700; }
 .tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.board-scroll { overflow: auto; border: 2px solid var(--line); border-radius: 12px; background: var(--hall); box-shadow: inset 0 0 0 1px rgba(153, 196, 213, .1); overscroll-behavior: contain; }
+.board-scroll { overflow: auto; border: 2px solid var(--line); border-radius: 12px; background: var(--hall); box-shadow: inset 0 0 0 1px rgba(153, 196, 213, .1); overflow-y: hidden; overscroll-behavior-x: contain; }
 #board { display: block; width: 100%; min-width: 680px; height: auto; user-select: none; -webkit-user-select: none; touch-action: pan-x pan-y; }
 #board text { fill: var(--ink); font-family: var(--body); pointer-events: none; }
 #board .mono { fill: var(--ink-soft); font-family: var(--mono); }
 .piece, .piece * { touch-action: none; }
 .piece { cursor: grab; }
+#board { cursor: crosshair; }
+.marquee { fill: rgba(79, 140, 170, .12); stroke: var(--accent-dark); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
 .piece.dragging { cursor: grabbing; }
 .piece.bad > .piece-shape { stroke: var(--warn); stroke-width: 4; }
 .piece.selected > .piece-shape { stroke: var(--accent); stroke-width: 4; }

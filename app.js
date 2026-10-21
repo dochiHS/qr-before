@@ -13,7 +13,7 @@
   var PLAN_COLORS = { living: "--living", kitchen: "--kitchen", room: "--room1", bath: "--bath", entry: "--entry" };
   var PLAN_NAMES = { living: "거실", kitchen: "주방", room: "방", bath: "욕실", entry: "현관" };
   var SVG_NS = "http://www.w3.org/2000/svg";
-  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, trayRows: 0, recommendation: null, guide: null, mineRects: [], matches: [], selectedMatch: null, viewMode: "side", planScope: "all", gu: "서구", similar: null, selectedApartment: null, estimate: null, quotePrice: null, quoteSource: "" };
+  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, group: [], trayRows: 0, recommendation: null, guide: null, mineRects: [], matches: [], selectedMatch: null, viewMode: "side", planScope: "all", gu: "서구", similar: null, selectedApartment: null, estimate: null, quotePrice: null, quoteSource: "" };
   var logicApi = null;
   var areaGuides = [];
   var recommendationRequestId = 0;
@@ -23,6 +23,7 @@
   var drag = null;
   state.editing = null; // 크기 조정 중인 조각 (집 안의 조각을 한 번 더 누르면 켜짐)
   var resize = null;
+  var marquee = null;
 
   var roomsControl = document.getElementById("rooms");
   var bathsControl = document.getElementById("baths");
@@ -153,6 +154,7 @@
     resetDownstream();
     state.recommendation = null;
     state.guide = null;
+    state.group = [];
     state.pieces = [];
     state.selected = null;
     recommendationTitle.textContent = "면적 데이터를 준비하고 있어요";
@@ -204,6 +206,7 @@
       state.cols = Math.max(widest, Math.ceil(Math.sqrt(cellsTotal * 1.5)));
       state.rows = Math.max(tallest, Math.ceil(cellsTotal / state.cols));
     }
+    state.group = [];
     state.pieces = pieces;
     state.selected = null;
     state.editing = null;
@@ -359,7 +362,7 @@
       var fontSize = narrow ? Math.min(22, Math.max(14, piece.w * 3.6)) : Math.min(15, Math.max(10, piece.w * 3));
       var grip = narrow ? 30 : 16;
       var inset = narrow ? 12 : 7;
-      var selected = (state.selected === index ? " selected" : "") + (state.editing === index ? " editing" : "");
+      var selected = (state.selected === index || inGroup(index) ? " selected" : "") + (state.editing === index ? " editing" : "");
       var handles = "";
       if (piece.x !== null && state.editing === index) {
         handles = '<rect class="resize-edge ns" data-side="top" x="' + inset + '" y="' + (-grip / 2) + '" width="' + (piece.w * PX - inset * 2) + '" height="' + grip + '"/>'
@@ -393,13 +396,27 @@
     return point.matrixTransform(board.getScreenCTM().inverse());
   }
 
+  function inGroup(index) { return Array.isArray(state.group) && state.group.length > 1 && state.group.indexOf(index) >= 0; }
+
   function startDrag(event) {
     var element = event.currentTarget;
     var index = Number(element.dataset.index);
     var point = svgPoint(event);
     var matrix = element.transform.baseVal.consolidate().matrix;
     state.selected = index;
-    drag = { element: element, index: index, dx: point.x - matrix.e, dy: point.y - matrix.f, startX: event.clientX, startY: event.clientY, moved: false, wasEditing: state.editing === index };
+    drag = { element: element, index: index, dx: point.x - matrix.e, dy: point.y - matrix.f, startX: event.clientX, startY: event.clientY, moved: false, wasEditing: state.editing === index,
+      px: point.x, py: point.y, group: null };
+    if (inGroup(index)) {
+      // 묶음으로 고른 조각을 잡으면 묶음 전체를 함께 옮긴다
+      drag.group = state.group.map(function (i) {
+        var el = board.querySelector('.piece[data-index="' + i + '"]');
+        var m = el.transform.baseVal.consolidate().matrix;
+        el.classList.add("dragging");
+        return { index: i, element: el, x: m.e, y: m.f };
+      });
+    } else {
+      state.group = [];
+    }
     if (state.editing !== null && state.editing !== index) state.editing = null;
     event.preventDefault();
     element.classList.add("dragging", "selected");
@@ -409,7 +426,8 @@
     window.addEventListener("pointermove", moveDrag);
     window.addEventListener("pointerup", endDrag);
     window.addEventListener("pointercancel", endDrag);
-    updateToolState();
+    // 끄는 도중 안내 문구 길이가 바뀌면 화면이 밀려 조각이 엉뚱한 칸에 놓인다. 묶음일 때는 문구를 그대로 둔다
+    if (!drag.group) updateToolState();
   }
 
   function moveDrag(event) {
@@ -418,6 +436,11 @@
     event.preventDefault();
     if (Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) > 6) drag.moved = true;
     point = svgPoint(event);
+    drag.last = point;
+    if (drag.group) {
+      drag.group.forEach(function (g) { g.element.setAttribute("transform", "translate(" + (g.x + point.x - drag.px) + " " + (g.y + point.y - drag.py) + ")"); });
+      return;
+    }
     drag.element.setAttribute("transform", "translate(" + (point.x - drag.dx) + " " + (point.y - drag.dy) + ")");
   }
 
@@ -434,6 +457,8 @@
     window.removeEventListener("pointerup", endDrag);
     window.removeEventListener("pointercancel", endDrag);
     piece = state.pieces[active.index];
+    if (active.group && active.moved) { endGroupDrag(active, event); return; }
+    if (active.group) state.group = [];
     if (!active.moved) {
       // 누르기만 한 경우: 집 안의 조각이면 크기 조정 모드를 켜고 끈다
       state.editing = piece.x !== null && !active.wasEditing ? active.index : null;
@@ -455,6 +480,91 @@
     }
     drawBoard();
     selectionStatus.textContent = moved === "tray" ? NAMES[piece.id] + "을 대기실로 돌려놨어요." : moved ? NAMES[piece.id] + " 위치를 0.5m 격자에 맞췄어요. 한 번 더 누르면 크기를 바꿀 수 있어요." : "놓을 수 없는 위치라 이전 자리로 돌아갔어요.";
+  }
+
+  function endGroupDrag(active) {
+    // 손을 뗄 때 좌표가 비어 오는 기기가 있어 마지막으로 움직인 위치를 쓴다
+    var point = active.last || { x: active.px, y: active.py };
+    var dx = Math.round((point.x - active.px) / PX);
+    var dy = Math.round((point.y - active.py) / PX);
+    var members = active.group.map(function (g) { return state.pieces[g.index]; });
+    var inHouse = members.every(function (p) { return p.x !== null; });
+    var ok = inHouse && members.every(function (p) {
+      var x = p.x + dx, y = p.y + dy;
+      return x >= 0 && y >= 0 && x + p.w <= state.cols && y + p.h <= state.rows && !state.pieces.some(function (o) {
+        return members.indexOf(o) < 0 && o.x !== null && x < o.x + o.w && o.x < x + p.w && y < o.y + o.h && o.y < y + p.h;
+      });
+    });
+    var toTray = !ok && point.y / PX > MARGIN + state.rows + 1;
+    state.editing = null;
+    if (ok) members.forEach(function (p) { p.x += dx; p.y += dy; });
+    else if (toTray) { members.forEach(function (p) { p.x = null; p.y = null; }); state.group = []; }
+    drawBoard();
+    selectionStatus.textContent = ok ? "묶음 " + members.length + "개를 함께 옮겼어요." : toTray ? "묶음 " + members.length + "개를 대기실로 돌려놨어요." : "벽이나 다른 조각에 걸려 묶음이 이전 자리로 돌아갔어요.";
+  }
+
+  // 집 안의 빈 곳(복도)에서 끌면 사각형 안에 걸친 조각을 묶음으로 고른다
+  function houseCell(point) {
+    return { x: point.x / PX - MARGIN, y: point.y / PX - MARGIN };
+  }
+  function insideHouse(point) {
+    var c = houseCell(point);
+    return c.x >= 0 && c.y >= 0 && c.x <= state.cols && c.y <= state.rows;
+  }
+  function startMarquee(event) {
+    var point;
+    if (drag || resize || event.button > 0) return;
+    if (event.target.closest && event.target.closest(".piece")) return;
+    point = svgPoint(event);
+    if (!insideHouse(point)) return;
+    event.preventDefault();
+    marquee = { x: point.x, y: point.y, startX: event.clientX, startY: event.clientY, moved: false, el: document.createElementNS("http://www.w3.org/2000/svg", "rect") };
+    marquee.el.setAttribute("class", "marquee");
+    board.append(marquee.el);
+    window.addEventListener("pointermove", moveMarquee);
+    window.addEventListener("pointerup", endMarquee);
+    window.addEventListener("pointercancel", endMarquee);
+  }
+  function marqueeBox(point, m) {
+    m = m || marquee;
+    return { x: Math.min(m.x, point.x), y: Math.min(m.y, point.y), w: Math.abs(point.x - m.x), h: Math.abs(point.y - m.y) };
+  }
+  function moveMarquee(event) {
+    var box;
+    if (!marquee) return;
+    event.preventDefault();
+    if (Math.abs(event.clientX - marquee.startX) + Math.abs(event.clientY - marquee.startY) > 6) marquee.moved = true;
+    marquee.last = svgPoint(event);
+    box = marqueeBox(marquee.last);
+    marquee.el.setAttribute("x", box.x); marquee.el.setAttribute("y", box.y);
+    marquee.el.setAttribute("width", box.w); marquee.el.setAttribute("height", box.h);
+  }
+  function endMarquee(event) {
+    var active = marquee;
+    var box;
+    var x1, y1, x2, y2;
+    if (!active) return;
+    marquee = null;
+    window.removeEventListener("pointermove", moveMarquee);
+    window.removeEventListener("pointerup", endMarquee);
+    window.removeEventListener("pointercancel", endMarquee);
+    state.editing = null;
+    if (!active.moved) {
+      state.group = [];
+      state.selected = null;
+      drawBoard();
+      return;
+    }
+    box = marqueeBox(active.last || { x: active.x, y: active.y }, active);
+    x1 = box.x / PX - MARGIN; y1 = box.y / PX - MARGIN; x2 = x1 + box.w / PX; y2 = y1 + box.h / PX;
+    state.group = [];
+    state.pieces.forEach(function (p, i) {
+      if (p.x !== null && p.x < x2 && x1 < p.x + p.w && p.y < y2 && y1 < p.y + p.h) state.group.push(i);
+    });
+    state.selected = state.group.length === 1 ? state.group[0] : null;
+    if (state.group.length < 2) state.group = [];
+    drawBoard();
+    if (state.group.length > 1) selectionStatus.textContent = "조각 " + state.group.length + "개를 묶었어요. 묶음 안의 조각을 끌면 함께 움직여요. 빈 곳을 누르면 풀려요.";
   }
 
   function startResize(event) {
@@ -550,6 +660,7 @@
     state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
     state.selected = null;
     state.editing = null;
+    state.group = [];
     renderPieceList();
     drawBoard();
     selectionStatus.textContent = "모든 조각을 원래 크기로 대기실에 돌려놨어요.";
@@ -614,6 +725,7 @@
     });
     state.selected = null;
     state.editing = null;
+    state.group = [];
     renderPieceList();
     drawBoard();
     selectionStatus.textContent = state.baths === 2 ? "안방 욕실은 안방 옆에, 공용 욕실은 복도 쪽에 둔 예시 배치예요." : "공용 욕실을 복도 쪽에 둔 예시 배치예요.";
@@ -1365,11 +1477,17 @@
   // iOS 사파리는 SVG 조각의 touch-action 을 무시하고 화면을 스크롤해 버린다.
   // 조각이나 테두리에서 시작한 터치만 기본 동작(스크롤·확대)을 막아 끌기가 끊기지 않게 한다.
   board.addEventListener("touchstart", function (event) {
+    var touch = event.touches[0];
     if (event.target.closest && event.target.closest(".piece")) event.preventDefault();
+    else if (touch && event.touches.length === 1 && insideHouse(svgPoint(touch))) event.preventDefault(); // 집 안 빈 곳은 묶음 고르기
   }, { passive: false });
   board.addEventListener("touchmove", function (event) {
-    if (drag || resize) event.preventDefault();
+    if (drag || resize || marquee) event.preventDefault();
   }, { passive: false });
+  board.addEventListener("pointerdown", startMarquee);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && state.group && state.group.length) { state.group = []; drawBoard(); }
+  });
   clearBoardButton.addEventListener("click", clearBoard);
   planScope.addEventListener("click", function (event) {
     var button = event.target.closest("button[data-scope]");
