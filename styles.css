@@ -19,6 +19,7 @@
   --room1: #bdddea;
   --room2: #d8d5ef;
   --room3: #f4cfdf;
+  --room4: #cfe8d6;
   --bath: #c8d5ef;
   --entry: #f2e3c6;
   --hall: #fffefc;
@@ -67,6 +68,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--lavender); outl
 .segmented { display: inline-flex; overflow: hidden; border: 2px solid var(--line); border-radius: 10px; background: var(--sheet); isolation: isolate; }
 .segmented button { -webkit-appearance: none; appearance: none; min-width: 48px; min-height: 44px; margin: 0; padding: 8px 15px; border: 0; border-right: 2px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); cursor: pointer; }
 .segmented button:last-child { border-right: 0; }
+.segmented button:disabled { color: #aab2bc; background: #f3f4f6; cursor: not-allowed; }
 .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--ink); font-weight: 800; }
 .data-status { padding: 11px 12px; border: 2px solid var(--line); border-radius: 9px; background: #f6f7f9; color: var(--ink-soft); font-size: 13px; }
 .data-status[data-state="ready"] { background: var(--accent-soft); color: var(--accent-dark); }

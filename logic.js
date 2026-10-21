@@ -9,7 +9,8 @@ const RECO = {
   "2-1": { area: 49, label: "20평형대 초반", note: "신혼·2인 가구가 많이 고르는 크기예요." },
   "2-2": { area: 59, label: "24평형", note: "방 2개에 화장실 2개면 59㎡가 무난해요." },
   "3-1": { area: 59, label: "24평형", note: "방 3개가 들어가는 가장 작은 아파트 크기예요." },
-  "3-2": { area: 84, label: "34평형 (국민평형)", note: "가장 많이 지어지는 크기로, 주택법의 국민주택규모(85㎡ 이하)에 맞춘 면적이에요." }
+  "3-2": { area: 84, label: "34평형 (국민평형)", note: "가장 많이 지어지는 크기로, 주택법의 국민주택규모(85㎡ 이하)에 맞춘 면적이에요." },
+  "4-2": { area: 102, label: "40평형대", note: "방 4개면 전용 100㎡ 안팎으로, 흔히 40평형대라고 불러요." }
 };
 
 const cache = {};
@@ -63,7 +64,7 @@ export async function findSimilar({ area, gu, limit = 10, range = 5 } = {}) {
 }
 
 // ───── 3. 내 그림 ↔ 실제 평면도 배치 일치율 ─────
-const CAT = { living: "living", kitchen: "kitchen", room1: "room", room2: "room", room3: "room", bath1: "bath", bath2: "bath", entry: "entry" };
+const CAT = { living: "living", kitchen: "kitchen", room1: "room", room2: "room", room3: "room", room4: "room", bath1: "bath", bath2: "bath", entry: "entry" };
 export const CAT_NAME = { living: "거실", kitchen: "주방", room: "방", bath: "욕실", entry: "현관" };
 const GX = 24, GY = 12;
 
@@ -119,15 +120,26 @@ export async function matchPlans(mine, { area, rooms, limit = 3, daejeonOnly = f
     .map(p => ({ plan: p, ...compareLayout(mine, p) }))
     .sort((x, y) => y.score - x.score)
     .slice(0, limit);
+  ranked.total = items.length;
   if (ranked.some(r => r.plan.trade)) {
     const { items: apts } = await load("apartments-daejeon.json");
     for (const r of ranked) {
       const t = r.plan.trade;
       if (!t) continue;
-      const hit = apts.filter(a => a.gu === t.gu && a.apt === t.apt && Math.abs(a.area - r.plan.area) <= 3)
-        .sort((a, b) => Math.abs(a.area - r.plan.area) - Math.abs(b.area - r.plan.area))[0];
-      if (hit) r.trade = { apt: hit.apt, gu: hit.gu, dong: hit.dong, area: hit.area, built: hit.built,
-        sale: hit.sale, lastSale: hit.lastSale, saleDate: hit.lastDate, jeonse: hit.jeonse, saleCount: hit.saleCount };
+      const same = apts.filter(a => a.gu === t.gu && a.apt === t.apt)
+        .sort((a, b) => Math.abs(a.area - r.plan.area) - Math.abs(b.area - r.plan.area));
+      const hit = same[0];
+      if (!hit) continue;
+      if (Math.abs(hit.area - r.plan.area) <= 3) {
+        r.trade = { apt: hit.apt, gu: hit.gu, dong: hit.dong, area: hit.area, built: hit.built,
+          sale: hit.sale, lastSale: hit.lastSale, saleDate: hit.lastDate, jeonse: hit.jeonse, saleCount: hit.saleCount };
+      } else {
+        // 같은 평형 거래가 없으면 같은 단지의 가장 가까운 평형 실거래가를 전용면적 비율로 환산한다.
+        const k = r.plan.area / hit.area, sc = v => (v ? Math.round((v * k) / 100) * 100 : v);
+        r.trade = { apt: hit.apt, gu: hit.gu, dong: hit.dong, area: r.plan.area, built: hit.built,
+          sale: sc(hit.sale), lastSale: sc(hit.lastSale || hit.sale), saleDate: hit.lastDate, jeonse: sc(hit.jeonse),
+          saleCount: hit.saleCount, estimated: true, baseArea: hit.area };
+      }
     }
   }
   return ranked;

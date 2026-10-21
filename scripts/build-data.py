@@ -258,6 +258,37 @@ KB = [
          r=[("kitchen", 728, 190, 840, 340, None), ("bath", 620, 277, 725, 345, None), ("room", 845, 218, 977, 340, None),
             ("bath", 980, 218, 1040, 340, None), ("entry", 528, 345, 597, 408, None), ("living", 660, 340, 857, 545, None),
             ("room", 527, 410, 657, 545, None), ("room", 857, 403, 1040, 560, "안방")]),
+    # ── 방 4개·화장실 2개 (전용 100~120㎡) ──
+    dict(id="dj-dunsan-crova-120", apt="둔산 크로바", type="120㎡ (전용 101.79)", region="대전 서구 둔산동", area=102, rooms=4, baths=2,
+         rot=None, trade=("서구", "크로바"), kb=8333, box=(530, 108, 1013, 605),
+         r=[("room", 565, 192, 698, 307, None), ("kitchen", 703, 137, 857, 330, None), ("room", 883, 162, 1010, 275, None),
+            ("bath", 805, 222, 880, 322, None), ("bath", 563, 312, 632, 377, None), ("entry", 935, 325, 1010, 375, None),
+            ("living", 703, 378, 877, 545, None), ("room", 532, 380, 698, 545, "안방"), ("room", 880, 378, 1010, 545, None)]),
+    dict(id="dj-dunsan-mokryeon-121b", apt="둔산 목련", type="121B㎡ (전용 101.83)", region="대전 서구 둔산동", area=102, rooms=4, baths=2,
+         rot=None, trade=("서구", "목련"), kb=8330, box=(565, 103, 1043, 585),
+         r=[("room", 568, 180, 678, 292, None), ("bath", 683, 230, 748, 330, None), ("kitchen", 750, 130, 860, 320, None),
+            ("room", 897, 192, 1040, 302, None), ("bath", 937, 307, 1030, 377, None), ("entry", 568, 318, 615, 372, None),
+            ("living", 695, 380, 865, 532, None), ("room", 568, 388, 692, 532, None), ("room", 867, 380, 1040, 532, "안방")]),
+    dict(id="dj-dunsan-hanmaru-122", apt="둔산 한마루", type="122㎡ (전용 101.94)", region="대전 서구 둔산동", area=102, rooms=4, baths=2,
+         rot=None, trade=("서구", "한마루아파트"), box=(550, 108, 1047, 608),
+         r=[("room", 552, 162, 678, 277, None), ("bath", 683, 222, 762, 327, None), ("kitchen", 752, 132, 875, 310, None),
+            ("room", 877, 192, 1012, 307, None), ("bath", 930, 310, 1028, 377, None), ("entry", 552, 310, 625, 385, None),
+            ("living", 680, 385, 878, 545, None), ("room", 552, 388, 677, 545, None), ("room", 878, 378, 1045, 545, "안방")]),
+    dict(id="dj-songchon-seonbi3-142", apt="송촌 선비마을3단지", type="142㎡ (전용 118.09)", region="대전 대덕구 송촌동", area=118, rooms=4, baths=2,
+         rot="left", trade=("대덕구", "선비마을3단지"), kb=8243, box=(492, 130, 1078, 620),
+         r=[("room", 562, 133, 725, 262, None), ("entry", 730, 133, 780, 202, None), ("room", 840, 133, 962, 245, None),
+            ("bath", 785, 248, 882, 322, None), ("kitchen", 885, 248, 997, 372, None), ("living", 562, 262, 785, 432, None),
+            ("room", 562, 437, 725, 617, "안방"), ("room", 790, 432, 940, 552, None), ("bath", 810, 557, 940, 617, None)]),
+    dict(id="dj-gwanpyeong-prugio-151", apt="관평 대덕테크노밸리2단지(대우푸르지오)", type="151㎡ (전용 118.66)", region="대전 유성구 관평동", area=119, rooms=4, baths=2,
+         rot=None, trade=("유성구", "대우푸르지오"), kb=13935, box=(528, 160, 1046, 493),
+         r=[("entry", 587, 270, 640, 328, None), ("bath", 642, 240, 708, 328, None), ("kitchen", 708, 225, 876, 328, None),
+            ("room", 878, 225, 980, 325, None), ("bath", 980, 210, 1046, 295, None), ("living", 738, 330, 900, 493, None),
+            ("room", 528, 350, 628, 493, None), ("room", 630, 370, 736, 493, None), ("room", 900, 372, 1046, 493, "안방")]),
+    dict(id="dj-gwanpyeong-prugio-132", apt="관평 대덕테크노밸리2단지(대우푸르지오)", type="132㎡ (전용 101.69)", region="대전 유성구 관평동", area=102, rooms=3, baths=2,
+         rot=None, trade=("유성구", "대우푸르지오"), kb=13935, box=(573, 158, 997, 500),
+         r=[("entry", 620, 280, 700, 340, None), ("kitchen", 700, 240, 822, 340, None), ("room", 824, 240, 936, 338, None),
+            ("bath", 938, 240, 997, 325, None), ("bath", 573, 338, 655, 392, None), ("living", 700, 340, 855, 500, None),
+            ("room", 573, 392, 697, 500, None), ("room", 855, 380, 997, 500, "안방")]),
 ]
 
 
@@ -311,9 +342,13 @@ RECO = {
     (2, 2): (59, "24평형", "방 2개에 화장실 2개면 59㎡가 무난해요."),
     (3, 1): (59, "24평형", "방 3개가 들어가는 가장 작은 아파트 크기예요."),
     (3, 2): (84, "34평형 (국민평형)", "가장 많이 지어지는 크기로, 주택법의 국민주택규모(85㎡ 이하)에 맞춘 면적이에요."),
+    (4, 2): (102, "40평형대", "방 4개면 전용 100㎡ 안팎으로, 흔히 40평형대라고 불러요."),
 }
 SHARE = {"living": (.24, 1.35), "kitchen": (.12, 1.4), "room1": (.15, 1.2), "room2": (.11, 1.15), "room3": (.10, 1.1),
          "bath1": (.045, 1.4), "bath2": (.04, 1.3), "entry": (.035, 1.0)}
+# 방 4개는 방이 늘어난 만큼 거실·주방 비율을 조금 줄여 복도 자리(약 20%)를 남긴다
+SHARE4 = {"living": (.21, 1.35), "kitchen": (.10, 1.4), "room1": (.13, 1.2), "room2": (.09, 1.15), "room3": (.085, 1.1),
+          "room4": (.08, 1.1), "bath1": (.035, 1.4), "bath2": (.03, 1.3), "entry": (.025, 1.0)}
 CELL = 0.5
 
 
@@ -338,7 +373,7 @@ def build_guide(plans):
         cols = round(math.sqrt(cells_total * 1.95)); rows_ = round(cells_total / cols)
         pieces = {}
         for pid in ids:
-            share, ratio = SHARE[pid]
+            share, ratio = (SHARE4 if rooms == 4 else SHARE)[pid]
             cells = area * share / (CELL * CELL)
             w = max(2, round(math.sqrt(cells * ratio))); h = max(2, round(cells / w))
             pieces[pid] = [w, h]

@@ -8,8 +8,8 @@
   function isNarrow() { return narrowQuery.matches; }
   function trayWidth() { return isNarrow() ? Math.max(state.cols, 12) : Math.max(state.cols, 28); }
   var MARGIN = 2;
-  var NAMES = { living: "거실", kitchen: "주방", room1: "방1", room2: "방2", room3: "방3", bath1: "욕실1", bath2: "욕실2", entry: "현관" };
-  var COLORS = { living: "--living", kitchen: "--kitchen", room1: "--room1", room2: "--room2", room3: "--room3", bath1: "--bath", bath2: "--bath", entry: "--entry" };
+  var NAMES = { living: "거실", kitchen: "주방", room1: "방1", room2: "방2", room3: "방3", room4: "방4", bath1: "욕실1", bath2: "욕실2", entry: "현관" };
+  var COLORS = { living: "--living", kitchen: "--kitchen", room1: "--room1", room2: "--room2", room3: "--room3", room4: "--room4", bath1: "--bath", bath2: "--bath", entry: "--entry" };
   var PLAN_COLORS = { living: "--living", kitchen: "--kitchen", room: "--room1", bath: "--bath", entry: "--entry" };
   var PLAN_NAMES = { living: "거실", kitchen: "주방", room: "방", bath: "욕실", entry: "현관" };
   var SVG_NS = "http://www.w3.org/2000/svg";
@@ -128,18 +128,21 @@
       button.type = "button";
       button.textContent = value + "개";
       button.setAttribute("aria-pressed", String(value === current));
+      if (control === bathsControl && state.rooms === 4 && value === 1) { button.disabled = true; button.title = "방 4개는 화장실 2개로 추천해요"; }
       button.addEventListener("click", function () { onPick(value); });
       control.append(button);
     });
   }
 
   function renderControls() {
-    renderSegmented(roomsControl, [1, 2, 3], state.rooms, function (value) {
+    renderSegmented(roomsControl, [1, 2, 3, 4], state.rooms, function (value) {
       state.rooms = value;
+      if (value === 4) state.baths = 2; // 방 4개는 화장실 2개 조합만 있다
       renderControls();
       updateRecommendation();
     });
     renderSegmented(bathsControl, [1, 2], state.baths, function (value) {
+      if (state.rooms === 4 && value === 1) return;
       state.baths = value;
       renderControls();
       updateRecommendation();
@@ -592,7 +595,7 @@
       if (!put(masterBath, master.x + master.w - masterBath.w, master.y - masterBath.h)) put(masterBath, master.x, master.y - masterBath.h);
     }
     cursor = 0;
-    ["room3", "bath1", "kitchen", "entry"].map(get).filter(Boolean).forEach(function (piece) {
+    ["room3", "room4", "bath1", "kitchen", "entry"].map(get).filter(Boolean).forEach(function (piece) {
       // 집이 작으면 북쪽 줄 조각의 세로를 최대 두 칸까지 줄여서 넣는다 ("전체 초기화"로 원래 크기 복귀)
       var originalHeight = piece.h;
       var height;
@@ -835,7 +838,7 @@
       });
       tradeCopy.className = "match-trade";
       if (trade) {
-        tradeCopy.textContent = "단지 실거래 · 최근 매매 " + formatPrice(trade.lastSale) + (trade.saleDate ? " (" + String(trade.saleDate) + ")" : "") + " · 1년 중앙값 " + formatPrice(trade.sale) + " · 전세 " + formatPrice(trade.jeonse);
+        tradeCopy.textContent = (trade.estimated ? "단지 실거래 환산(전용 " + String(trade.baseArea) + "㎡ 거래 기준)" : "단지 실거래") + " · 최근 매매 " + formatPrice(trade.lastSale) + (trade.saleDate ? " (" + String(trade.saleDate) + ")" : "") + " · 1년 중앙값 " + formatPrice(trade.sale) + " · 전세 " + formatPrice(trade.jeonse);
       } else {
         tradeCopy.textContent = "연결된 단지 거래 정보가 없습니다. 견적서는 선택 지역·면적의 매매 중앙값을 사용합니다.";
       }
@@ -851,8 +854,15 @@
     });
   }
 
+  // 대전 단지 도면을 고르면 지역 선택도 그 단지의 구로 맞춘다.
+  function followPlanGu(match) {
+    var gu = match && match.plan && match.plan.trade && match.plan.trade.gu;
+    if (gu && gu !== state.gu) { state.gu = gu; renderDistrictControl(); }
+  }
+
   function selectMatch(match) {
     state.selectedMatch = match;
+    followPlanGu(match);
     state.selectedApartment = null;
     state.estimate = null;
     state.quotePrice = null;
@@ -908,9 +918,10 @@
       state.matches = matches.filter(function (match) { return match && match.plan && Array.isArray(match.plan.rects); }).slice(0, 3);
       if (!state.matches.length) throw new Error("조건에 맞는 실제 평면도를 찾지 못했어요.");
       state.selectedMatch = state.matches[0];
+      followPlanGu(state.selectedMatch);
       renderPlanMatches();
       planSource.textContent = "도면 출처: " + String(state.selectedMatch.plan.sourceName || "출처 정보 없음") + ". 일치율은 같은 공간의 겹침과 중심 위치를 함께 비교한 참고값입니다.";
-      matchStatus.textContent = (state.planScope === "daejeon" ? "대전 아파트에서 " : "전체 43개 도면에서 ") + "가장 닮은 " + state.matches.length + "개를 찾았어요.";
+      matchStatus.textContent = (state.planScope === "daejeon" ? "대전 아파트에서 " : "전체 " + (matches.total || "") + "개 도면에서 ") + "가장 닮은 " + state.matches.length + "개를 찾았어요.";
       matchStatus.dataset.state = "ready";
       loadSimilar();
     }).catch(function (error) {
@@ -962,10 +973,10 @@
     if (Number.isFinite(tradePrice) && tradePrice > 0) {
       return {
         price: tradePrice,
-        label: "단지 최근 실거래가",
+        label: trade.estimated ? "같은 단지 실거래가 면적 환산" : "단지 최근 실거래가",
         title: String(trade.apt || match.plan.apt || "선택한 단지"),
-        meta: String(trade.gu || "") + (trade.dong ? " " + String(trade.dong) : "") + " · 전용 " + String(trade.area || area || "-") + "㎡" + (trade.saleDate ? " · " + String(trade.saleDate) + " 거래" : ""),
-        source: "선택한 평면도와 연결된 단지 최근 실거래가"
+        meta: String(trade.gu || "") + (trade.dong ? " " + String(trade.dong) : "") + " · 전용 " + String(trade.area || area || "-") + "㎡" + (trade.estimated ? " (전용 " + String(trade.baseArea) + "㎡ 거래가 환산)" : "") + (trade.saleDate ? " · " + String(trade.saleDate) + " 거래" : ""),
+        source: trade.estimated ? "같은 단지 전용 " + String(trade.baseArea) + "㎡ 실거래가를 면적 비율로 환산" : "선택한 평면도와 연결된 단지 최근 실거래가"
       };
     }
     if (Number.isFinite(medianPrice) && medianPrice > 0) {
