@@ -13,7 +13,7 @@
   var PLAN_COLORS = { living: "--living", kitchen: "--kitchen", room: "--room1", bath: "--bath", entry: "--entry" };
   var PLAN_NAMES = { living: "거실", kitchen: "주방", room: "방", bath: "욕실", entry: "현관" };
   var SVG_NS = "http://www.w3.org/2000/svg";
-  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, group: [], trayRows: 0, recommendation: null, guide: null, mineRects: [], matches: [], selectedMatch: null, viewMode: "side", planScope: "all", gu: "서구", similar: null, selectedApartment: null, estimate: null, quotePrice: null, quoteSource: "" };
+  var state = { rooms: 3, baths: 2, cols: 0, rows: 0, pieces: [], selected: null, group: [], trayRows: 0, recommendation: null, guide: null, mineRects: [], matches: [], selectedMatch: null, viewMode: "side", planScope: "daejeon", gu: "서구", similar: null, selectedApartment: null, estimate: null, quotePrice: null, quoteSource: "" };
   var logicApi = null;
   var areaGuides = [];
   var recommendationRequestId = 0;
@@ -1101,7 +1101,7 @@
     state.mineRects = mine;
     matchStatus.textContent = (state.planScope === "daejeon" ? "대전 아파트" : "전체") + " 평면도와 배치를 비교하고 있어요.";
     matchStatus.dataset.state = "";
-    Promise.resolve(logicApi.matchPlans(mine, { area: Number(state.recommendation.area), rooms: state.rooms, limit: 3, daejeonOnly: state.planScope === "daejeon" })).then(function (matches) {
+    Promise.resolve(logicApi.matchPlans(mine, { area: Number(state.recommendation.area), rooms: state.rooms, baths: state.baths, limit: 3, daejeonOnly: state.planScope === "daejeon" })).then(function (matches) {
       if (requestId !== matchRequestId) return;
       if (!Array.isArray(matches)) throw new Error("평면도 비교 반환값이 규격과 다릅니다.");
       state.matches = matches.filter(function (match) { return match && match.plan && Array.isArray(match.plan.rects); }).slice(0, 3);
@@ -1110,7 +1110,7 @@
       followPlanGu(state.selectedMatch);
       renderPlanMatches();
       planSource.textContent = "도면 출처: " + String(state.selectedMatch.plan.sourceName || "출처 정보 없음") + ". 일치율은 같은 공간의 겹침과 중심 위치를 함께 비교한 참고값입니다.";
-      matchStatus.textContent = (state.planScope === "daejeon" ? "대전 아파트에서 " : "전체 " + (matches.total || "") + "개 도면에서 ") + "가장 닮은 " + state.matches.length + "개를 찾았어요.";
+      matchStatus.textContent = (state.matches.some(function (m) { return m.sameConfig; }) ? "방 " + state.rooms + "개·욕실 " + state.baths + "개 구성이 같은 도면을 먼저, " : "대전에 방 " + state.rooms + "개·욕실 " + state.baths + "개 도면이 없어 비슷한 크기 도면으로, ") + (state.planScope === "daejeon" ? "대전 아파트에서 " : "전국 " + (matches.total || "") + "개 도면에서 ") + "가장 닮은 " + state.matches.length + "개를 찾았어요.";
       matchStatus.dataset.state = "ready";
       loadSimilar();
     }).catch(function (error) {

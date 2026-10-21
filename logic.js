@@ -113,13 +113,19 @@ export function compareLayout(mine, plan) {
 
 // mine: toRects() 결과. 비슷한 면적(±16㎡) 또는 같은 방 개수인 도면 중 일치율 높은 순
 // daejeonOnly: 대전 단지 도면만. 대전 도면은 같은 단지의 실거래가(trade)를 붙여 돌려준다.
-export async function matchPlans(mine, { area, rooms, limit = 3, daejeonOnly = false } = {}) {
+// 방·욕실 개수가 같은 도면을 먼저, 그다음 일치율 순. daejeonOnly면 대전 단지 도면만 (같은 구성이 없으면 비슷한 면적의 대전 도면).
+export async function matchPlans(mine, { area, rooms, baths, limit = 3, daejeonOnly = false } = {}) {
   const { items } = await load("plans.json");
-  const ranked = items
-    .filter(p => (!daejeonOnly || p.daejeon) && (!area || Math.abs(p.area - area) <= 16 || p.rooms === rooms))
-    .map(p => ({ plan: p, ...compareLayout(mine, p) }))
-    .sort((x, y) => y.score - x.score)
-    .slice(0, limit);
+  const myRooms = rooms ?? mine.filter(r => r.t === "room").length;
+  const myBaths = baths ?? mine.filter(r => r.t === "bath").length;
+  const near = p => !area || Math.abs(p.area - area) <= 16 || p.rooms === myRooms;
+  const same = p => p.rooms === myRooms && p.baths === myBaths;
+  const rank = (list, filter) => list.filter(filter).map(p => ({ plan: p, sameConfig: same(p), ...compareLayout(mine, p) }))
+    .sort((x, y) => (y.sameConfig - x.sameConfig) || (y.score - x.score));
+  const pool = items.filter(p => !daejeonOnly || p.daejeon);
+  let ranked = rank(pool, near);
+  if (ranked.length < limit) ranked = rank(pool, () => true); // 비슷한 면적이 모자라면 면적 조건 없이
+  ranked = ranked.slice(0, limit);
   ranked.total = items.length;
   if (ranked.some(r => r.plan.trade)) {
     const { items: apts } = await load("apartments-daejeon.json");
