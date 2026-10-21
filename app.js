@@ -116,7 +116,7 @@
     matchStatus.dataset.state = "";
     planSource.textContent = "LH 주택 평면도와 대전 기존 단지 평면도를 단순화해 비교합니다.";
     similarStatus.textContent = "실제 평면도를 선택하면 대전 실거래가를 찾아요.";
-    apartmentSource.textContent = "실거래 데이터에는 방 개수가 없어 선택한 실제 평면도의 전용면적 ±5㎡와 지역으로 비교합니다.";
+    apartmentSource.textContent = "실거래 데이터에는 방 개수가 없어 내 집 전용면적 ±5㎡와 지역으로 비교합니다.";
     goStep4.disabled = true;
     saveEstimateButton.disabled = true;
     estimateResultDetails.hidden = true;
@@ -985,7 +985,7 @@
       var tradeCopy = document.createElement("p");
       var sourceLink = createSourceLink(plan);
       var caption;
-      card.className = "plan-match-card" + (state.selectedMatch === match ? " is-selected" : "");
+      card.className = "plan-match-card";
       head.className = "plan-match-head";
       title.textContent = (index + 1) + "위 · " + String(plan.apt || "실제 평면도") + " " + String(plan.type || "");
       meta.textContent = String(plan.region || "지역 정보 없음") + " · 전용 " + String(plan.area || "-") + "㎡ · 방 " + String(plan.rooms || "-") + " · 욕실 " + String(plan.baths || "-");
@@ -1031,14 +1031,9 @@
       } else {
         tradeCopy.textContent = "연결된 단지 거래 정보가 없습니다. 견적서는 선택 지역·면적의 매매 중앙값을 사용합니다.";
       }
-      button.type = "button";
-      button.className = "secondary-button";
-      button.setAttribute("aria-pressed", String(state.selectedMatch === match));
-      button.textContent = state.selectedMatch === match ? "시세 비교 기준으로 선택됨" : "이 평면도 크기로 시세 찾기";
-      button.addEventListener("click", function () { selectMatch(match); });
+      // 도면 카드는 몇 % 닮았는지 추천만 한다. 시세는 아래에서 내 집 크기 기준으로 찾는다
       card.append(head, pair, parts, tradeCopy);
       if (sourceLink) card.append(sourceLink);
-      card.append(button);
       planMatchList.append(card);
     });
   }
@@ -1144,21 +1139,44 @@
   function renderMarketSummary(result) {
     var summary = result.summary || {};
     var count = Number(summary.count);
-    var area = state.selectedMatch && state.selectedMatch.plan ? Number(state.selectedMatch.plan.area) : NaN;
+    var area = myArea();
     summaryCount.textContent = (Number.isFinite(count) ? count : result.items.length) + "곳";
     summarySale.textContent = formatPrice(summary.medianSale);
     summaryJeonse.textContent = formatPrice(summary.medianJeonse);
     marketSummary.hidden = false;
-    apartmentSource.textContent = "비교 기준: " + (Number.isFinite(area) ? "선택한 실제 평면도 전용면적 " + area + "㎡ ±5㎡" : "선택한 실제 평면도 전용면적 ±5㎡") + " · " + state.gu + ". " + (summary.period ? "거래 기간 " + String(summary.period) + ". " : "") + "출처: " + String(summary.source || "국토교통부 아파트 매매·전월세 실거래가 공개 API") + ".";
+    apartmentSource.textContent = "비교 기준: " + (Number.isFinite(area) ? "내 집 전용면적 " + area + "㎡ ±5㎡" : "내 집 전용면적 ±5㎡") + " · " + state.gu + ". " + (summary.period ? "거래 기간 " + String(summary.period) + ". " : "") + "출처: " + String(summary.source || "국토교통부 아파트 매매·전월세 실거래가 공개 API") + ".";
   }
 
+  function myArea() { return state.recommendation ? Number(state.recommendation.area) : NaN; }
+
+  // 견적 가격: 목록에서 고른 아파트 → 내 집 크기·지역 매매 중앙값 → (거래가 없으면) 가장 닮은 대전 단지 실거래가
   function resolveQuote() {
     var match = state.selectedMatch;
     var trade = match && match.trade;
     var tradePrice = trade && Number(trade.lastSale);
     var summary = state.similar && state.similar.summary;
     var medianPrice = summary && Number(summary.medianSale);
-    var area = match && match.plan && Number(match.plan.area);
+    var area = myArea();
+    var picked = state.selectedApartment;
+    var pickedPrice = picked && apartmentPrice(picked);
+    if (Number.isFinite(pickedPrice) && pickedPrice > 0) {
+      return {
+        price: pickedPrice,
+        label: "고른 아파트 최근 실거래가",
+        title: String(picked.apt || "고른 아파트"),
+        meta: state.gu + (picked.dong ? " " + String(picked.dong) : "") + " · 전용 " + String(picked.area) + "㎡" + (picked.saleDate ? " · " + String(picked.saleDate) + " 거래" : ""),
+        source: String(picked.apt || "고른 아파트") + " 최근 실거래가"
+      };
+    }
+    if (Number.isFinite(medianPrice) && medianPrice > 0) {
+      return {
+        price: medianPrice,
+        label: "지역·면적 기준 매매 중앙값",
+        title: state.gu + " 내 집 크기 아파트",
+        meta: "전용 " + String(area || "-") + "㎡ ±5㎡" + (summary.period ? " · " + String(summary.period) : ""),
+        source: state.gu + " 전용 " + String(area || "-") + "㎡ ±5㎡ 매매 중앙값"
+      };
+    }
     if (Number.isFinite(tradePrice) && tradePrice > 0) {
       return {
         price: tradePrice,
@@ -1166,15 +1184,6 @@
         title: String(trade.apt || match.plan.apt || "선택한 단지"),
         meta: String(trade.gu || "") + (trade.dong ? " " + String(trade.dong) : "") + " · 전용 " + String(trade.area || area || "-") + "㎡" + (trade.estimated ? " (전용 " + String(trade.baseArea) + "㎡ 거래가 환산)" : "") + (trade.saleDate ? " · " + String(trade.saleDate) + " 거래" : ""),
         source: trade.estimated ? "같은 단지 전용 " + String(trade.baseArea) + "㎡ 실거래가를 면적 비율로 환산" : "선택한 평면도와 연결된 단지 최근 실거래가"
-      };
-    }
-    if (Number.isFinite(medianPrice) && medianPrice > 0) {
-      return {
-        price: medianPrice,
-        label: "지역·면적 기준 매매 중앙값",
-        title: state.gu + " 비슷한 면적 아파트",
-        meta: "전용 " + String(area || "-") + "㎡ ±5㎡" + (summary.period ? " · " + String(summary.period) : ""),
-        source: state.gu + " 전용 " + String(area || "-") + "㎡ ±5㎡ 매매 중앙값"
       };
     }
     return null;
@@ -1203,10 +1212,11 @@
   }
 
   function selectApartment(item) {
-    state.selectedApartment = item;
+    state.selectedApartment = state.selectedApartment === item ? null : item; // 다시 누르면 선택 해제
     state.estimate = null;
     saveEstimateButton.disabled = true;
     renderApartmentList(state.similar.items);
+    updateQuoteAvailability();
   }
 
   function renderApartmentList(items) {
@@ -1251,7 +1261,7 @@
 
   function loadSimilar() {
     var requestId = ++similarRequestId;
-    var area = state.selectedMatch && state.selectedMatch.plan && Number(state.selectedMatch.plan.area);
+    var area = myArea();
     state.similar = null;
     state.selectedApartment = null;
     state.estimate = null;
@@ -1259,7 +1269,7 @@
     apartmentList.replaceChildren();
     goStep4.disabled = true;
     if (!Number.isFinite(area)) {
-      setSimilarStatus("실제 평면도를 선택하면 대전 실거래가를 찾아요.", "error");
+      setSimilarStatus("방·화장실을 고르면 내 집 크기로 대전 실거래가를 찾아요.", "error");
       return;
     }
     if (!logicApi || typeof logicApi.findSimilar !== "function") {
@@ -1322,9 +1332,9 @@
   function renderEstimateStep() {
     var match = state.selectedMatch;
     var quote = resolveQuote();
-    var area = match && match.plan && Number(match.plan.area);
+    var area = myArea();
     if (!match || !quote) return;
-    estimateArea.textContent = Number.isFinite(area) ? "비교형 전용 " + area + "㎡" : "전용면적 정보 없음";
+    estimateArea.textContent = Number.isFinite(area) ? "내 집 전용 " + area + "㎡" : "전용면적 정보 없음";
     estimateApartment.textContent = quote.title;
     estimateApartmentMeta.textContent = quote.meta;
     estimatePriceLabel.textContent = quote.label;
@@ -1333,7 +1343,7 @@
     state.quotePrice = quote.price;
     state.quoteSource = quote.source;
     renderFloorplanPreview();
-    estimateMatchPlan.replaceChildren(createPlanSvg(match.plan.rects, null, "선택한 실제 평면도"));
+    estimateMatchPlan.replaceChildren(createPlanSvg(match.plan.rects, null, "가장 닮은 실제 평면도", match.plan.aspect));
     estimateMatchMeta.textContent = String(match.plan.apt || "실제 평면도") + " " + String(match.plan.type || "") + " · 일치율 " + String(Number(match.score) || 0) + "% · " + String(match.plan.sourceName || "출처 정보 없음");
     resetEstimateResult("몇 년 안에 사고 싶은지 입력해 주세요.");
   }
@@ -1486,7 +1496,7 @@
     context.fillStyle = "#2d3137";
     context.font = "700 25px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     context.fillText("내 도면", 70, 195);
-    context.fillText("선택한 실제 평면도 · " + String(Number(match.score) || 0) + "%", 560, 195);
+    context.fillText("가장 닮은 실제 평면도 · " + String(Number(match.score) || 0) + "%", 560, 195);
     drawExportPlan(context, 70, 220, 450, 360);
     drawNormalizedExportPlan(context, match.plan.rects, 560, 220, 450, 360);
     context.fillStyle = "#2d3137";
