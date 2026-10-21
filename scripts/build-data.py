@@ -350,6 +350,9 @@ SHARE = {"living": (.24, 1.35), "kitchen": (.12, 1.4), "room1": (.15, 1.2), "roo
 SHARE4 = {"living": (.21, 1.35), "kitchen": (.10, 1.4), "room1": (.13, 1.2), "room2": (.09, 1.15), "room3": (.085, 1.1),
           "room4": (.08, 1.1), "bath1": (.035, 1.4), "bath2": (.03, 1.3), "entry": (.025, 1.0)}
 CELL = 0.5
+# 집 테두리 가로:세로. 실제 평면도 49장의 외곽 비율이 0.4~1.6(중앙값 약 1.0)이라 남향 폭을 조금 넓힌 1.35로 둔다
+ASPECT = 1.35
+ASPECT4 = 1.7  # 방 4개는 남쪽에 방 셋과 거실이 나란히 서는 4베이라 폭이 넓다
 
 
 def lh_shares(plans):
@@ -370,7 +373,7 @@ def build_guide(plans):
     for (rooms, baths), (area, label, note) in RECO.items():
         ids = ["living", "kitchen"] + [f"room{i}" for i in range(1, rooms + 1)] + [f"bath{i}" for i in range(1, baths + 1)] + ["entry"]
         cells_total = area / (CELL * CELL)
-        cols = round(math.sqrt(cells_total * 1.95)); rows_ = round(cells_total / cols)
+        cols = round(math.sqrt(cells_total * (ASPECT4 if rooms == 4 else ASPECT))); rows_ = round(cells_total / cols)
         pieces = {}
         for pid in ids:
             share, ratio = (SHARE4 if rooms == 4 else SHARE)[pid]
@@ -387,7 +390,7 @@ def build_guide(plans):
         items.append({"rooms": rooms, "baths": baths, "area": area, "label": label, "note": note,
                       "box": [cols * CELL, rows_ * CELL],
                       "pieces": {k: [w * CELL, h * CELL] for k, (w, h) in pieces.items()},
-                      "source": "전용면적 대비 공간 비율 예시(거실 24%·주방 12%·안방 15% 등). LH 주택 평면도(공공데이터포털) 26장·대전 단지 평면도 17장과 비율 대조"})
+                      "source": "전용면적 대비 공간 비율 예시(거실 24%·주방 12%·안방 15% 등). LH 주택 평면도(공공데이터포털) 26장·대전 단지 평면도 23장과 비율 대조"})
     return {"note": "크기는 [가로m, 세로m], 0.5m 단위. box는 집 테두리 크기", "lhShares": lh_shares(plans), "items": items}
 
 
