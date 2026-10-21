@@ -1184,9 +1184,9 @@
     var column;
     var row;
     var styles = getComputedStyle(document.documentElement);
-    context.fillStyle = styles.getPropertyValue("--hall").trim() || "#fbfaf5";
+    context.fillStyle = styles.getPropertyValue("--hall").trim() || "#fffefc";
     context.fillRect(left, top, planWidth, planHeight);
-    context.strokeStyle = "#d9ded9";
+    context.strokeStyle = "#e5e7eb";
     context.lineWidth = 1;
     for (column = 0; column <= state.cols; column += 1) {
       context.beginPath();
@@ -1210,16 +1210,16 @@
       pieceY = top + piece.y * scale;
       pieceWidth = piece.w * scale;
       pieceHeight = piece.h * scale;
-      context.fillStyle = styles.getPropertyValue(COLORS[piece.id]).trim() || "#dde4df";
+      context.fillStyle = styles.getPropertyValue(COLORS[piece.id]).trim() || "#dceaf0";
       context.fillRect(pieceX, pieceY, pieceWidth, pieceHeight);
-      context.strokeStyle = "#1f2a2e";
+      context.strokeStyle = "#2d3137";
       context.strokeRect(pieceX, pieceY, pieceWidth, pieceHeight);
-      context.fillStyle = "#1f2a2e";
+      context.fillStyle = "#2d3137";
       context.font = "700 18px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
       context.textAlign = "center";
       context.fillText(NAMES[piece.id], pieceX + pieceWidth / 2, pieceY + pieceHeight / 2 + 6, Math.max(0, pieceWidth - 8));
     });
-    context.strokeStyle = "#1f2a2e";
+    context.strokeStyle = "#2d3137";
     context.lineWidth = 5;
     context.strokeRect(left, top, planWidth, planHeight);
     context.textAlign = "left";
@@ -1227,7 +1227,7 @@
 
   function drawNormalizedExportPlan(context, rects, x, y, width, height) {
     var styles = getComputedStyle(document.documentElement);
-    context.fillStyle = styles.getPropertyValue("--hall").trim() || "#fbfaf5";
+    context.fillStyle = styles.getPropertyValue("--hall").trim() || "#fffefc";
     context.fillRect(x, y, width, height);
     (Array.isArray(rects) ? rects : []).forEach(function (rect) {
       var left = x + Number(rect.x) * width;
@@ -1235,13 +1235,13 @@
       var rectWidth = Number(rect.w) * width;
       var rectHeight = Number(rect.h) * height;
       if (![left, top, rectWidth, rectHeight].every(Number.isFinite) || rectWidth <= 0 || rectHeight <= 0) return;
-      context.fillStyle = styles.getPropertyValue(PLAN_COLORS[rect.t] || "--hall").trim() || "#dde4df";
+      context.fillStyle = styles.getPropertyValue(PLAN_COLORS[rect.t] || "--hall").trim() || "#dceaf0";
       context.fillRect(left, top, rectWidth, rectHeight);
-      context.strokeStyle = "#1f2a2e";
+      context.strokeStyle = "#2d3137";
       context.lineWidth = 2;
       context.strokeRect(left, top, rectWidth, rectHeight);
     });
-    context.strokeStyle = "#1f2a2e";
+    context.strokeStyle = "#2d3137";
     context.lineWidth = 5;
     context.strokeRect(x, y, width, height);
   }
@@ -1256,34 +1256,34 @@
     canvas.width = 1080;
     canvas.height = 1400;
     context = canvas.getContext("2d");
-    context.fillStyle = "#f3f4ef";
+    context.fillStyle = "#fffdf9";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#1f2a2e";
+    context.fillStyle = "#2d3137";
     context.font = "700 54px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     context.fillText("나만의 집 마련 견적서", 70, 95);
-    context.fillStyle = "#2f6f62";
+    context.fillStyle = "#4f7f93";
     context.font = "700 26px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     context.fillText(estimateArea.textContent, 70, 145);
-    context.fillStyle = "#1f2a2e";
+    context.fillStyle = "#2d3137";
     context.font = "700 25px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     context.fillText("내 도면", 70, 195);
     context.fillText("선택한 실제 평면도 · " + String(Number(match.score) || 0) + "%", 560, 195);
     drawExportPlan(context, 70, 220, 450, 360);
     drawNormalizedExportPlan(context, match.plan.rects, 560, 220, 450, 360);
-    context.fillStyle = "#1f2a2e";
+    context.fillStyle = "#2d3137";
     context.font = "700 36px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     wrapCanvasText(context, estimateApartment.textContent, 70, 660, 940, 46);
-    context.fillStyle = "#5d696c";
+    context.fillStyle = "#68707a";
     context.font = "24px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     context.fillText(estimateApartmentMeta.textContent, 70, 715);
-    context.fillStyle = "#1f2a2e";
+    context.fillStyle = "#2d3137";
     context.font = "700 32px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     context.fillText(estimatePriceLabel.textContent + "  " + estimatePrice.textContent, 70, 780);
     context.fillText("목표 기간  " + String(years) + "년", 70, 835);
-    context.fillStyle = "#2f6f62";
+    context.fillStyle = "#4f7f93";
     context.font = "700 40px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     wrapCanvasText(context, state.estimate.text, 70, 925, 940, 52);
-    context.fillStyle = "#5d696c";
+    context.fillStyle = "#68707a";
     context.font = "22px \"Pretendard Variable\", Pretendard, system-ui, sans-serif";
     wrapCanvasText(context, "가격 기준: " + state.quoteSource, 70, 1160, 940, 30);
     wrapCanvasText(context, "도면: " + String(match.plan.sourceName || "출처 정보 없음") + " · 시세: 국토교통부 아파트 실거래가 공개 API", 70, 1220, 940, 30);
