@@ -15,7 +15,7 @@
 1. 조건 고르기: 방 수(1~3), 화장실 수(1~2) → 평수가 정해지고(예: 방3·화장실2 = 전용 84㎡, 34평형) 그 평수에 맞춘 방1·방2·방3·거실·주방·욕실·현관 크기가 미터 단위로 나옴
 2. 끌어다 채우기: 대기실의 조각을 0.5m 격자 집 테두리 안으로 끌어다 놓음. 겹치면 원위치, 돌리기 가능. 놓은 조각은 위·아래·좌·우 테두리를 끌어 크기 조절(처음 크기는 평수 기준, "원래 크기로" 버튼으로 복귀). 조각 합계는 집의 약 80%라 남는 칸이 복도·벽이 됨. 다 채우면 현관에서 거실·주방·복도를 거쳐 모든 방에 갈 수 있는지, 거실이 남쪽 벽에 붙었는지 검사
 3. 비슷한 아파트: 지역(대전 5개 구) 선택 → 전용면적 ±5㎡ 아파트의 단지명, 최근 매매가·전세가, 건축년도
-4. 견적서 카드: 내 집 그림 + 닮은 대전 아파트 시세 + 예상 월급 입력·모으는 비율(기본 100%) → "월급 한 푼 안 쓰면 ○년 / 30%씩 모으면 ○년" → 이미지로 저장·공유
+4. 견적서 카드: 내 집 그림 + 닮은 대전 아파트 시세 + "한 달에 얼마 모을 수 있어요?" 입력 → "한 달에 ○만원씩 모으면 ○년 ○개월" + 목표 기간 버튼(5·10·20년) → "10년 안에 사려면 한 달에 ○만원씩" → 이미지로 저장·공유
 
 ## 쓰는 공공데이터
 
@@ -58,7 +58,7 @@
 화면은 아래 함수만 부른다. 바꿀 일이 생기면 먼저 공유한다.
 
 ```js
-import { recommendArea, findSimilar, estimate } from './logic.js';
+import { recommendArea, findSimilar, estimate, needPerMonth } from './logic.js';
 
 recommendArea(rooms, baths)
 // → { area: 84, pyeong: 25.4, label: '34평형 (국민평형)', note: '...' }
@@ -70,8 +70,8 @@ findSimilar({ area: 84, gu: '서구', limit: 10 })
 //             sale: 61000, saleDate: '2026-09', jeonse: 36000, built: 1994 }]
 // }
 
-estimate({ price: 52000, monthly: 380, saveRate: 1 })   // 예상 월급은 사용자가 입력 (만원)
-// → { monthly: 380, months: 137, years: 11.4, text: '월급을 한 푼도 안 쓰면 11년 5개월' }
+estimate({ price: 52000, perMonth: 150 })   // 한 달에 모을 돈은 사용자가 입력 (만원)
+// → { months: 347, years: 28.9, text: '한 달에 150만원씩 모으면 28년 11개월' }
 ```
 
 평수·공간 크기 데이터 (`data/area-guide.json`) 한 건의 모양:
@@ -93,13 +93,14 @@ estimate({ price: 52000, monthly: 380, saveRate: 1 })   // 예상 월급은 사�
 - 시안 `prototype/index.html`에 Step 3 "내 그림과 가장 닮은 실제 집" 화면(나란히/겹쳐 보기, 공간별 위치 같음/다름) 추가
 
 ```js
-import { recommendArea, findSimilar, toRects, matchPlans, estimate } from './logic.js';
+import { recommendArea, findSimilar, toRects, matchPlans, estimate, needPerMonth } from './logic.js';
 const mine = toRects(state.pieces, state.cols, state.rows);      // 집 안에 놓은 조각만
 const top3 = await matchPlans(mine, { area: 84, rooms: 3 });
 // → [{ plan: {apt, type, region, area, rooms, baths, rects, source}, score: 53, parts: [{name:'거실', same:true}, ...] }]
 const near = await findSimilar({ area: top3[0].plan.area, gu: '서구', limit: 10 });
-const quote = estimate({ price: near.summary.medianSale, monthly: 300, saveRate: 0.3 });
-// → { months: 445, years: 37.1, perMonth: 90, text: '월급의 30%씩 모으면 37년 1개월' }  (saveRate 생략 = 100%)
+const quote = estimate({ price: top3[0].trade?.lastSale ?? near.summary.medianSale, perMonth: 100 });
+// → { months: 400, years: 33.3, text: '한 달에 100만원씩 모으면 33년 4개월' }
+needPerMonth({ price: 40000, years: 10 })   // → { perMonth: 334, text: '10년 안에 사려면 한 달에 334만원씩' }
 ```
 
 ## 일정
@@ -109,7 +110,7 @@ const quote = estimate({ price: near.summary.medianSale, monthly: 300, saveRate:
 | 10/20 16:30~19:00 | API 신청, 실거래 수집, 평수·공간 크기표 | 시안 옮겨 화면 뼈대 |
 | 19:00~22:00 | 단지별 정리, `logic.js` 1차, LH 평면도 대조 | Step 1·2 화면, 끌어다 놓기 |
 | 22:00 | **1차 통합**: 실제 데이터로 Step 3까지 동작 | |
-| 10/21 ~11:00 | 견적 로직(예상 월급 입력), 검사, 기획안 초안 | 견적서 카드, 모바일, manifest |
+| 10/21 ~11:00 | 견적 로직(한 달 저축액 입력), 검사, 기획안 초안 | 견적서 카드, 모바일, manifest |
 | 11:00~13:00 | 발표 시나리오, 기획안 제출 도구 입력 | 배포, 휴대폰 확인 |
 | 13:00~15:00 | 기능과 기획안 문장 대조 | 버그 수정 |
 | 15:00~16:00 | 발표 리허설 (같이) | |

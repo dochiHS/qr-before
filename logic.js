@@ -133,20 +133,23 @@ export async function matchPlans(mine, { area, rooms, limit = 3, daejeonOnly = f
   return ranked;
 }
 
-// ───── 4. 견적: 월급 몇 년 ─────
-// price: 집값(만원), monthly: 사용자가 넣은 예상 월급(만원), saveRate: 월급 중 모으는 비율(0~1, 기본 1 = 한 푼도 안 씀)
-export function estimate({ price, monthly, saveRate = 1 } = {}) {
-  const m = Number(monthly), r = Number(saveRate);
-  if (!(price > 0) || !(m > 0)) throw new Error("집값(price)과 예상 월급(monthly)이 필요해요.");
-  if (!(r > 0 && r <= 1)) throw new Error("모으는 비율(saveRate)은 0보다 크고 1 이하여야 해요.");
-  const perMonth = m * r;
-  const months = Math.ceil(price / perMonth);
-  const years = Math.round((months / 12) * 10) / 10;
-  const y = Math.floor(months / 12), mo = months % 12;
-  const span = `${y}년${mo ? ` ${mo}개월` : ""}`;
-  const pct = Math.round(r * 100);
-  return {
-    monthly: m, saveRate: r, perMonth: Math.round(perMonth), months, years,
-    text: r === 1 ? `월급을 한 푼도 안 쓰면 ${span}` : `월급의 ${pct}%씩 모으면 ${span}`
-  };
+// ───── 4. 견적: 한 달에 얼마씩 모으면 살 수 있나 ─────
+const span = months => { const y = Math.floor(months / 12), mo = months % 12; return `${y ? `${y}년` : ""}${y && mo ? " " : ""}${mo ? `${mo}개월` : ""}` || "0개월"; };
+const won = v => v >= 10000 ? `${Math.floor(v / 10000)}억${v % 10000 ? ` ${(v % 10000).toLocaleString()}만` : ""}원` : `${v.toLocaleString()}만원`;
+
+// price: 집값(만원), perMonth: 한 달에 모을 수 있는 돈(만원) → 걸리는 기간
+export function estimate({ price, perMonth } = {}) {
+  const p = Number(price), m = Number(perMonth);
+  if (!(p > 0) || !(m > 0)) throw new Error("집값(price)과 한 달에 모을 돈(perMonth)이 필요해요.");
+  const months = Math.ceil(p / m);
+  return { price: p, perMonth: m, months, years: Math.round((months / 12) * 10) / 10,
+    text: `한 달에 ${won(m)}씩 모으면 ${span(months)}` };
+}
+
+// 거꾸로: years 년 안에 사려면 한 달에 얼마씩 모아야 하나
+export function needPerMonth({ price, years } = {}) {
+  const p = Number(price), y = Number(years);
+  if (!(p > 0) || !(y > 0)) throw new Error("집값(price)과 목표 기간(years)이 필요해요.");
+  const perMonth = Math.ceil(p / (y * 12));
+  return { price: p, years: y, perMonth, text: `${y}년 안에 사려면 한 달에 ${won(perMonth)}씩` };
 }
