@@ -368,6 +368,39 @@ def lh_shares(plans):
     return {k: round(sum(v) / len(v), 3) for k, v in acc.items()}
 
 
+def fit_to_box(pieces, rooms, cols, rows):
+    """비율로 만든 조각 크기를 집 테두리 모양에 맞춘다 (app.js autoPlace와 같은 판상형 틀).
+    남쪽 줄(방2·거실·안방, 방 4개면 방3도)은 집 깊이의 절반, 북쪽 줄(방·공용 욕실·현관·주방)은 38%,
+    사이는 복도. 줄마다 원래 너비 비율대로 집 폭을 나눠 갖고, 욕실·현관은 좁은 쪽을 너비로 쓴다."""
+    rnd = lambda v: int(v + 0.5)
+    south_h = max(2, rnd(rows * 0.5))
+    north_h = max(2, min(rows - south_h - 1, rnd(rows * 0.38)))
+    out = {k: list(v) for k, v in pieces.items()}
+
+    def lay(ids, height, flex_id, fixed, end_gap=0):
+        row = [i for i in ids if i in pieces]
+        room = cols - end_gap
+        narrow = {i: max(3, min(pieces[i])) for i in row if i in fixed}  # 욕실·현관 폭은 1.5m 이상
+        flex_total = sum(pieces[i][0] for i in row if i not in fixed)
+        widths = {i: narrow[i] if i in fixed else max(5, (pieces[i][0] * (room - sum(narrow.values()))) // flex_total) for i in row}
+        f = flex_id if flex_id in row else row[0]
+        extra = room - sum(widths.values())
+        if f == "kitchen":  # 주방이 북쪽 줄을 혼자 다 차지하지 않게 원래 너비의 1.5배, 거실 너비까지만 (남는 칸은 복도)
+            widths[f] = min(widths[f] + extra, max(5, min(int(pieces[f][0] * 1.5), out["living"][0])))
+        else:
+            widths[f] += extra
+        for i in row:
+            out[i] = [max(2, widths[i]), min(max(pieces[i]), height) if i in fixed else height]
+
+    lay(["room3", "room2", "living", "room1"] if rooms >= 4 else ["room2", "living", "room1"], south_h, "living", [])
+    gap = 0
+    if "bath2" in pieces:
+        out["bath2"] = [max(3, min(pieces["bath2"])), min(max(pieces["bath2"]), rows - south_h)]
+        gap = out["bath2"][0]
+    lay(["room4" if rooms >= 4 else "room3", "bath1", "entry", "kitchen"], north_h, "kitchen", ["bath1", "entry"], gap)
+    return out
+
+
 def build_guide(plans):
     items = []
     for (rooms, baths), (area, label, note) in RECO.items():
@@ -387,6 +420,7 @@ def build_guide(plans):
             if p[0] <= p[1]: p[0] += 1
             else: p[1] += 1
             g += 1
+        pieces = fit_to_box(pieces, rooms, cols, rows_)
         items.append({"rooms": rooms, "baths": baths, "area": area, "label": label, "note": note,
                       "box": [cols * CELL, rows_ * CELL],
                       "pieces": {k: [w * CELL, h * CELL] for k, (w, h) in pieces.items()},

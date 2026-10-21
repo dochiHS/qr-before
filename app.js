@@ -573,45 +573,27 @@
     return false;
   }
 
-  // 예시 배치: 실제 판상형 평면도처럼 남쪽 줄(방2·거실·안방)과 북쪽 줄(방3·공용 욕실·현관·주방·안방 욕실)을
-  // 두고, 두 줄 사이를 복도로 비운다. 조각 너비는 원래 크기 비율대로 집 폭에 맞춰 늘리거나 줄인다.
-  // 안방 욕실(욕실2)은 안방 바로 위, 공용 욕실과는 주방·현관을 사이에 둔다. ("전체 초기화"로 원래 크기 복귀)
+  // 예시 배치: 실제 판상형 평면도처럼 남쪽 줄(방2·거실·안방, 방 4개면 방3도)과 북쪽 줄(방3·공용 욕실·현관·주방)을
+  // 두고 두 줄 사이를 복도로 비운다. 안방 욕실(욕실2)은 오른쪽 끝, 안방 바로 위.
+  // 조각 크기는 build-data.py가 이 틀에 맞춰 정해 두었으므로 여기서는 자리만 잡는다.
   function autoPlace() {
     var get = function (id) { return state.pieces.find(function (piece) { return piece.id === id; }); };
-    var southH = Math.max(2, Math.round(state.rows * 0.5));
-    var northH = Math.max(2, Math.min(state.rows - southH - 1, Math.round(state.rows * 0.38)));
-    // fixed: 원래 너비를 지키는 조각(욕실·현관). 나머지 조각이 남은 폭을 원래 너비 비율대로 나눠 갖는다.
-    var lay = function (ids, y, height, flexId, fixed, endGap) {
-      var row = ids.map(get).filter(Boolean);
-      var room = state.cols - (endGap || 0);
-      var narrow = function (piece) { return Math.min(piece.w0, piece.h0); };
-      var fixedW = row.reduce(function (sum, piece) { return sum + (fixed.indexOf(piece.id) >= 0 ? narrow(piece) : 0); }, 0);
-      var flexTotal = row.reduce(function (sum, piece) { return sum + (fixed.indexOf(piece.id) >= 0 ? 0 : piece.w0); }, 0);
-      var widths = row.map(function (piece) {
-        return fixed.indexOf(piece.id) >= 0 ? narrow(piece) : Math.max(2, Math.floor(piece.w0 * (room - fixedW) / flexTotal));
-      });
-      var flex = row.findIndex(function (piece) { return piece.id === flexId; });
+    var row = function (ids, south) {
       var x = 0;
-      widths[flex < 0 ? 0 : flex] += room - widths.reduce(function (sum, w) { return sum + w; }, 0);
-      row.forEach(function (piece, i) {
-        piece.w = Math.max(2, widths[i]);
-        piece.h = fixed.indexOf(piece.id) >= 0 ? Math.min(Math.max(piece.w0, piece.h0), height) : height;
+      ids.map(get).filter(Boolean).forEach(function (piece) {
         piece.x = x;
-        piece.y = y === "south" ? state.rows - piece.h : 0;
+        piece.y = south ? state.rows - piece.h : 0;
         x += piece.w;
       });
     };
     var masterBath = get("bath2");
+    var master = get("room1");
     state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
-    // 방 4개는 실제 4베이 평면도처럼 남쪽에 방 셋과 거실을 나란히 둔다
-    lay(state.rooms >= 4 ? ["room3", "room2", "living", "room1"] : ["room2", "living", "room1"], "south", southH, "living", []);
-    if (masterBath) { masterBath.w = Math.min(masterBath.w0, masterBath.h0); masterBath.h = Math.max(masterBath.w0, masterBath.h0); }
-    lay(state.rooms >= 4 ? ["room4", "bath1", "entry", "kitchen"] : ["room3", "bath1", "entry", "kitchen"], "north", northH, "kitchen", ["bath1", "entry"], masterBath ? masterBath.w : 0);
-    if (masterBath) {
-      // 안방 욕실은 오른쪽 끝, 안방(방1) 바로 위에 붙인다
-      masterBath.h = Math.min(masterBath.h, state.rows - southH);
+    row(state.rooms >= 4 ? ["room3", "room2", "living", "room1"] : ["room2", "living", "room1"], true);
+    row([state.rooms >= 4 ? "room4" : "room3", "bath1", "entry", "kitchen"], false);
+    if (masterBath && master) {
       masterBath.x = state.cols - masterBath.w;
-      masterBath.y = state.rows - southH - masterBath.h;
+      masterBath.y = master.y - masterBath.h;
     }
     // 혹시 겹치거나 집 밖이면 그 조각만 원래 크기로 되돌려 아래에서 빈자리를 찾게 한다
     state.pieces.forEach(function (piece, index) {
