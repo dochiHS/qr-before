@@ -123,6 +123,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--lavender); outl
 .resize-edge { fill: transparent; touch-action: none; }
 .resize-edge.ns { cursor: ns-resize; }
 .resize-edge.ew { cursor: ew-resize; }
+.resize-edge.nwse { cursor: nwse-resize; }
+.resize-edge.nesw { cursor: nesw-resize; }
+.piece.editing .resize-edge.corner { fill: #fff; stroke: var(--accent-dark); stroke-width: 3; opacity: 1; }
+.piece.editing .resize-edge.corner:hover { fill: var(--accent-dark); }
 .piece.editing > .piece-shape { stroke: var(--accent-dark); stroke-width: 4; stroke-dasharray: 10 6; }
 .piece.editing .resize-edge { fill: var(--accent-dark); opacity: .45; }
 .piece.editing .resize-edge:hover { opacity: .7; }

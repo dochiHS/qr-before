@@ -369,6 +369,11 @@
           + '<rect class="resize-edge ns" data-side="bottom" x="' + inset + '" y="' + (piece.h * PX - grip / 2) + '" width="' + (piece.w * PX - inset * 2) + '" height="' + grip + '"/>'
           + '<rect class="resize-edge ew" data-side="left" x="' + (-grip / 2) + '" y="' + inset + '" width="' + grip + '" height="' + (piece.h * PX - inset * 2) + '"/>'
           + '<rect class="resize-edge ew" data-side="right" x="' + (piece.w * PX - grip / 2) + '" y="' + inset + '" width="' + grip + '" height="' + (piece.h * PX - inset * 2) + '"/>';
+        // 네 모서리: 가로·세로를 한 번에 (대각선) 조절
+        [["top-left", 0, 0, "nwse"], ["top-right", 1, 0, "nesw"], ["bottom-left", 0, 1, "nesw"], ["bottom-right", 1, 1, "nwse"]].forEach(function (c) {
+          var size = grip * 1.15;
+          handles += '<rect class="resize-edge corner ' + c[3] + '" data-side="' + c[0] + '" x="' + (c[1] * piece.w * PX - size / 2) + '" y="' + (c[2] * piece.h * PX - size / 2) + '" width="' + size + '" height="' + size + '" rx="3"/>';
+        });
       }
       markup += '<g class="piece' + selected + '" data-index="' + index + '" transform="translate(' + (pieceX * PX) + ' ' + (pieceY * PX) + ')">'
         + '<rect class="piece-shape" width="' + (piece.w * PX) + '" height="' + (piece.h * PX) + '" fill="var(' + COLORS[piece.id] + ')" stroke="var(--ink)" stroke-width="2.5"/>'
@@ -606,21 +611,21 @@
     width = piece.w;
     height = piece.h;
     // 집 벽을 넘지 않게 자르고, 옆 조각에 닿으면 그 앞에서 멈춘다
-    if (resize.side === "right") {
+    if (resize.side.indexOf("right") >= 0) {
       width = Math.min(Math.max(2, gridX - piece.x), state.cols - piece.x);
       while (width > piece.w && overlaps(resize.index, x, y, width, height)) width -= 1;
     }
-    if (resize.side === "bottom") {
+    if (resize.side.indexOf("bottom") >= 0) {
       height = Math.min(Math.max(2, gridY - piece.y), state.rows - piece.y);
       while (height > piece.h && overlaps(resize.index, x, y, width, height)) height -= 1;
     }
-    if (resize.side === "left") {
+    if (resize.side.indexOf("left") >= 0) {
       next = Math.max(0, Math.min(gridX, piece.x + piece.w - 2));
       while (next < piece.x && overlaps(resize.index, next, y, piece.x + piece.w - next, height)) next += 1;
       width = piece.x + piece.w - next;
       x = next;
     }
-    if (resize.side === "top") {
+    if (resize.side.indexOf("top") >= 0) {
       next = Math.max(0, Math.min(gridY, piece.y + piece.h - 2));
       while (next < piece.y && overlaps(resize.index, x, next, width, piece.y + piece.h - next)) next += 1;
       height = piece.y + piece.h - next;
