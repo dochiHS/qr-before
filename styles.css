@@ -19,9 +19,9 @@
   --entry: #e3e1da;
   --hall: #fbfaf5;
   --shadow: 0 16px 45px rgba(40, 52, 48, .08);
-  --display: "Do Hyeon", "IBM Plex Sans KR", system-ui, sans-serif;
-  --body: "IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --display: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --body: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --mono: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -34,7 +34,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 
 .app-shell { width: min(1120px, 100%); margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-right)) 44px max(16px, env(safe-area-inset-left)); }
 .site-header { padding: 18px 2px 22px; }
-.brand { color: var(--ink); font-family: var(--display); font-size: clamp(32px, 9vw, 48px); line-height: 1; text-decoration: none; }
+.brand { color: var(--ink); font-family: var(--display); font-size: clamp(32px, 9vw, 48px); font-weight: 800; line-height: 1; text-decoration: none; }
 .site-header p { max-width: 620px; margin: 10px 0 0; color: var(--ink-soft); }
 
 .step-nav { margin-bottom: 24px; overflow-x: auto; scrollbar-width: thin; }
@@ -49,8 +49,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 
 .step-section { display: grid; gap: 18px; }
 .section-intro { display: grid; gap: 4px; padding: 6px 2px; }
-.section-intro h1, .panel h2 { margin: 0; font-family: var(--display); font-weight: 400; }
-.section-intro h1 { font-size: clamp(28px, 8vw, 40px); }
+.section-intro h1, .panel h2 { margin: 0; font-family: var(--display); }
+.section-intro h1 { font-size: clamp(28px, 8vw, 40px); font-weight: 800; }
+.panel h2 { font-weight: 700; }
 .section-intro > p:not(.eyebrow) { max-width: 680px; margin: 4px 0 0; color: var(--ink-soft); }
 .eyebrow { margin: 0; color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 
@@ -176,7 +177,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #80b9ad; outline-offs
 
 .estimate-card { display: grid; gap: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--sheet); box-shadow: var(--shadow); }
 .estimate-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-.estimate-header h2 { font-family: var(--display); font-size: 26px; font-weight: 400; }
+.estimate-header h2 { font-family: var(--display); font-size: 26px; font-weight: 700; }
 .estimate-area { padding: 7px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-dark); font-family: var(--mono); font-size: 12px; font-weight: 700; }
 .estimate-grid { display: grid; gap: 16px; }
 .estimate-grid section { min-width: 0; }
