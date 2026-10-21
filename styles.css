@@ -290,7 +290,10 @@ footer p { margin: 4px 0 0; }
 
 /* 도면 크게 보기 */
 .zoomable { cursor: zoom-in; }
-.zoomable:hover .plan-svg, .zoomable:focus-visible .plan-svg { border-color: var(--accent-dark); }
+.zoomable { border-radius: 10px; -webkit-tap-highlight-color: transparent; }
+.zoomable:focus { outline: none; }
+.zoomable:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.zoomable:hover .plan-svg { opacity: .92; }
 .plan-pair { align-items: start; }
 .plan-zoom { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 20px; border: 2px solid var(--line); border-radius: 16px; background: var(--sheet, #fff); color: var(--ink); overflow: auto; }
 .plan-zoom::backdrop { background: rgba(30, 34, 40, .55); }

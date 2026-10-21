@@ -910,6 +910,8 @@
       dialog.className = "plan-zoom";
       document.body.append(dialog);
       dialog.addEventListener("click", function (event) { if (event.target === dialog) dialog.close(); });
+      // 닫은 뒤 눌렀던 도면 묶음에 포커스 테두리가 남지 않게 한다
+      dialog.addEventListener("close", function () { setTimeout(function () { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }, 0); });
     }
     dialog.replaceChildren();
     var head = document.createElement("div");
@@ -1009,14 +1011,13 @@
         planFigure.append(caption);
         pair.append(mineFigure, planFigure);
       }
-      [mineFigure, planFigure].forEach(function (figure) {
-        figure.classList.add("zoomable");
-        figure.tabIndex = 0;
-        figure.setAttribute("role", "button");
-        figure.setAttribute("aria-label", "크게 보기");
-        figure.addEventListener("click", function () { openPlanZoom(match, index); });
-        figure.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPlanZoom(match, index); } });
-      });
+      // 두 그림을 한 덩어리로 눌러 크게 본다
+      pair.classList.add("zoomable");
+      pair.tabIndex = 0;
+      pair.setAttribute("role", "button");
+      pair.setAttribute("aria-label", "두 도면 크게 보기");
+      pair.addEventListener("click", function () { openPlanZoom(match, index); });
+      pair.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPlanZoom(match, index); } });
       parts.className = "match-parts";
       (Array.isArray(match.parts) ? match.parts : []).forEach(function (part) {
         var item = document.createElement("li");
