@@ -305,7 +305,10 @@ def rotate(r, rot):
 def build_plans():
     items = []
     for p in LH + KB:
-        x1, y1, x2, y2 = p["box"]
+        # 외곽은 그려 넣은 공간들을 감싸는 사각형으로 잡는다. 트레이싱 box에 들어간 발코니·여백을 빼야
+        # 남쪽 거실이 집 아래 벽에 닿고, 사용자가 그린 집(벽까지 꽉 찬 격자)과 같은 기준으로 비교된다.
+        x1 = min(r[1] for r in p["r"]); y1 = min(r[2] for r in p["r"])
+        x2 = max(r[3] for r in p["r"]); y2 = max(r[4] for r in p["r"])
         W, H = x2 - x1, y2 - y1
         rects = []
         for t, a, b, c, d, n in p["r"]:
@@ -453,6 +456,13 @@ def example_from_plan(plan, rooms, baths, cols, rows):
     for i, r in enumerate(others[:rooms - 1]):
         assign[f"room{i + 2}"] = r
     bs = [r for r in rects if r["t"] == "bath"]
+    if baths == 2 and len(bs) == 1:
+        # 도면에 욕실이 하나뿐이면 그 욕실을 둘로 나눠 시작한다 (욕실 하나 더 넣은 집)
+        b0 = bs[0]
+        if b0["w"] >= b0["h"]:
+            bs = [dict(b0, w=b0["w"] / 2), dict(b0, x=b0["x"] + b0["w"] / 2, w=b0["w"] / 2)]
+        else:
+            bs = [dict(b0, h=b0["h"] / 2), dict(b0, y=b0["y"] + b0["h"] / 2, h=b0["h"] / 2)]
     if baths == 2 and len(bs) >= 2:
         mc = (master["x"] + master["w"] / 2, master["y"] + master["h"] / 2)
         bs = sorted(bs, key=lambda r: math.hypot(r["x"] + r["w"] / 2 - mc[0], r["y"] + r["h"] / 2 - mc[1]))
@@ -496,24 +506,125 @@ def example_from_plan(plan, rooms, baths, cols, rows):
     return placed
 
 
-def build_example(plans, rooms, baths, cols, rows):
-    best = None
-    for p in plans:
-        if not p.get("daejeon") or p["rooms"] != rooms or p["baths"] != baths:
+MIN_SIDE = {"living": 5, "room1": 5, "room2": 5, "room3": 5, "room4": 5, "kitchen": 4, "bath1": 3, "bath2": 3, "entry": 2}
+PASS = {"living", "kitchen", "entry"}
+
+
+def _cat(k):
+    return "room" if k.startswith("room") else "bath" if k.startswith("bath") else k
+
+
+def _violations(lay, ids, cols, rows):
+    """app.js 검사와 같은 규칙: 집 안, 겹침 없음, 거실 남쪽, 최소 폭, 현관에서 모든 공간에 길."""
+    v = 0
+    owner = [[None] * cols for _ in range(rows)]
+    for k in ids:
+        if k not in lay:
+            v += 10; continue
+        x, y, w, h = lay[k]
+        if x < 0 or y < 0 or x + w > cols or y + h > rows:
+            v += 10; continue
+        if min(w, h) < MIN_SIDE[k]:
+            v += MIN_SIDE[k] - min(w, h)
+        for j in range(y, y + h):
+            for i in range(x, x + w):
+                if owner[j][i]:
+                    v += 1
+                owner[j][i] = k
+    if v:
+        return v
+    lx, ly, lw, lh = lay["living"]
+    if ly + lh != rows:
+        v += 3
+    ex, ey, ew, eh = lay["entry"]
+    seen = {(i, j) for j in range(ey, ey + eh) for i in range(ex, ex + ew)}
+    q = list(seen); reached = {"entry"}
+    while q:
+        i, j = q.pop()
+        for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            a, b = i + di, j + dj
+            if 0 <= a < cols and 0 <= b < rows:
+                o = owner[b][a]
+                if o:
+                    reached.add(o)
+                if (a, b) not in seen and (o is None or o in PASS):
+                    seen.add((a, b)); q.append((a, b))
+    v += 2 * len(set(ids) - reached)
+    return v
+
+
+def _score_lay(lay, plan, cols, rows):
+    mine = [{"t": _cat(k), "x": x / cols, "y": y / rows, "w": w / cols, "h": h / rows} for k, (x, y, w, h) in lay.items()]
+    return score_like_app(mine, plan)
+
+
+def optimize_example(plan, ids, rooms, baths, cols, rows, seed, iters=6000):
+    """실제 도면을 옮긴 배치에서 시작해, 검사를 모두 통과하면서 그 도면과의 일치율이 가장 높게 조각을 한 칸씩 다듬는다."""
+    import random
+    rnd = random.Random(seed)
+    lay = example_from_plan(plan, rooms, baths, cols, rows)
+    for k in ids:  # 도면에 없는 조각(예: 욕실 하나 더)은 일단 왼쪽 위에 둔다
+        if k not in lay:
+            lay[k] = [0, 0, MIN_SIDE[k], MIN_SIDE[k]]
+    lay = {k: list(v) for k, v in lay.items() if k in ids}
+
+    def value(l):
+        return _score_lay(l, plan, cols, rows) - 40 * _violations(l, ids, cols, rows)
+    cur = value(lay); best = (cur, {k: list(v) for k, v in lay.items()})
+    for t in range(iters):
+        k = rnd.choice(ids)
+        x, y, w, h = lay[k]
+        m = rnd.randrange(8)
+        cand = [x, y, w, h]
+        if m == 0: cand[0] += rnd.choice((-1, 1))
+        elif m == 1: cand[1] += rnd.choice((-1, 1))
+        elif m == 2: cand[2] += rnd.choice((-1, 1))
+        elif m == 3: cand[3] += rnd.choice((-1, 1))
+        elif m == 4: cand[0] -= 1; cand[2] += 1
+        elif m == 5: cand[1] -= 1; cand[3] += 1
+        elif m == 6: cand[0] += 1; cand[2] -= 1
+        else: cand[1] += 1; cand[3] -= 1
+        if cand[2] < 2 or cand[3] < 2:
             continue
+        old = lay[k]; lay[k] = cand
+        nv = value(lay)
+        temp = max(0.05, 3 * (1 - t / iters))
+        if nv >= cur or rnd.random() < math.exp((nv - cur) / temp):
+            cur = nv
+            if cur > best[0]:
+                best = (cur, {kk: list(vv) for kk, vv in lay.items()})
+        else:
+            lay[k] = old
+    lay = best[1]
+    return lay, _violations(lay, ids, cols, rows), _score_lay(lay, plan, cols, rows)
+
+
+MIN_SIDE_SMALL = {"living": 4, "room1": 4, "kitchen": 3, "bath1": 2, "bath2": 2, "entry": 2}
+
+
+def build_example(plans, rooms, baths, cols, rows, iters=40000, seeds=(1, 2)):
+    if rooms == 1:  # 원룸형 작은 집은 최소 폭을 조금 낮춘다 (거실·방 2m, 주방 1.5m)
+        MIN_SIDE.update(MIN_SIDE_SMALL)
+        if baths == 2:  # 대전에 방1·욕실2 도면이 없어 방1·욕실1 도면에 욕실을 하나 더 넣는다: 방 폭 1.5m까지 허용
+            MIN_SIDE.update({"room1": 3, "kitchen": 3})
+    else:
+        MIN_SIDE.update({"living": 5, "room1": 5, "kitchen": 4, "bath1": 3, "bath2": 3})
+    ids = ["living", "kitchen"] + [f"room{i}" for i in range(1, rooms + 1)] + [f"bath{i}" for i in range(1, baths + 1)] + ["entry"]
+    dj = [p for p in plans if p.get("daejeon")]
+    same = [p for p in dj if p["rooms"] == rooms and p["baths"] == baths]
+    # 같은 구성이 없으면 방·욕실 개수 차이가 가장 작은 대전 도면 (화면도 그 도면들과 비교한다)
+    pool = same or sorted(dj, key=lambda p: abs(p["rooms"] - rooms) * .08 + abs(p["baths"] - baths) * .05)[:6]
+    # 도면을 그대로 옮겼을 때 점수가 높은 4장만 다듬는다 (시간 절약)
+    def raw(p):
         lay = example_from_plan(p, rooms, baths, cols, rows)
-        cat = lambda k: "room" if k.startswith("room") else "bath" if k.startswith("bath") else k
-        mine = [{"t": cat(k), "x": x / cols, "y": y / rows, "w": w / cols, "h": h / rows} for k, (x, y, w, h) in lay.items()]
-        expected = len(["living", "kitchen", "entry"]) + rooms + baths
-        sc = score_like_app(mine, p)
-        # 모든 조각이 들어가고 거실이 남쪽에 닿는 도면만 예시로 쓴다
-        if len(lay) < expected or "living" not in lay or sum(lay["living"][1::2]) != rows:
-            continue
-        # 방·거실·주방이 1.5m(3칸)보다 좁으면 예시로 어색하다
-        if any(min(v[2], v[3]) < 3 for k, v in lay.items() if not k.startswith("bath") and k != "entry"):
-            continue
-        if not best or sc > best[0]:
-            best = (sc, p, lay)
+        return _score_lay({k: v for k, v in lay.items() if k in ids}, p, cols, rows) if lay else 0
+    pool = sorted(pool, key=raw, reverse=True)[:4]
+    best = None
+    for p in pool:
+        for seed in seeds:
+            lay, viol, sc = optimize_example(p, ids, rooms, baths, cols, rows, seed, iters)
+            if viol == 0 and (not best or sc > best[0]):
+                best = (sc, p, lay)
     if not best:
         return None
     sc, p, lay = best
@@ -540,7 +651,7 @@ def build_guide(plans):
             else: p[1] += 1
             g += 1
         pieces = fit_to_box(pieces, rooms, cols, rows_)
-        item_example = build_example(plans, rooms, baths, cols, rows_)
+        item_example = EXAMPLES.get(f"{rooms}-{baths}")  # 오래 걸려서 미리 계산해 둔 값 (--examples로 다시 계산)
         items.append({"rooms": rooms, "baths": baths, "area": area, "label": label, "note": note,
                       "box": [cols * CELL, rows_ * CELL],
                       **({"example": item_example} if item_example else {}),
@@ -561,7 +672,39 @@ def attach_prices(plans, apts):
             p["price"] = {k: h[k] for k in ("area", "built", "sale", "saleCount", "lastSale", "lastDate", "jeonse")}
 
 
+EXAMPLES_PATH = os.path.join(ROOT, "data", "raw", "examples.json")
+EXAMPLES = json.load(open(EXAMPLES_PATH, encoding="utf-8")) if os.path.exists(EXAMPLES_PATH) else {}
+
+
+EXAMPLE_ITERS = {"1-1": 30000, "1-2": 30000, "2-1": 15000, "2-2": 25000}
+
+
+def _example_job(args):
+    plans, rooms, baths, cols, rows = args
+    key = f"{rooms}-{baths}"
+    return key, build_example(plans, rooms, baths, cols, rows, iters=EXAMPLE_ITERS.get(key, 8000))
+
+
+def compute_examples(plans):
+    """예시 배치를 다시 계산해 data/raw/examples.json에 저장한다 (조합마다 몇 분 걸림)."""
+    from multiprocessing import Pool
+    jobs = []
+    for (rooms, baths), (area, _, _) in RECO.items():
+        cells_total = area / (CELL * CELL)
+        cols = round(math.sqrt(cells_total * (ASPECT4 if rooms == 4 else ASPECT))); rows_ = round(cells_total / cols)
+        jobs.append((plans, rooms, baths, cols, rows_))
+    with Pool(2) as pool:
+        out = dict(pool.map(_example_job, jobs))
+    with open(EXAMPLES_PATH, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    return out
+
+
 if __name__ == "__main__":
+    import sys
+    if "--examples" in sys.argv:
+        EXAMPLES.update(compute_examples(build_plans()["items"]))
+        print({k: v and (v["ref"], v["score"]) for k, v in EXAMPLES.items()})
     apts = build_apartments()
     plans = build_plans()
     attach_prices(plans, apts)
