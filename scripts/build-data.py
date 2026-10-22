@@ -401,6 +401,125 @@ def fit_to_box(pieces, rooms, cols, rows):
     return out
 
 
+
+# ───── 예시 배치: 같은 방·욕실 구성의 대전 단지 도면을 집 격자에 옮겨 만든다 ─────
+GX, GY = 24, 12
+
+
+def _raster(rects):
+    g = [None] * (GX * GY)
+    for j in range(GY):
+        for i in range(GX):
+            cx, cy = (i + .5) / GX, (j + .5) / GY
+            for r in rects:
+                if r["x"] <= cx < r["x"] + r["w"] and r["y"] <= cy < r["y"] + r["h"]:
+                    g[j * GX + i] = r["t"]
+                    break
+    return g
+
+
+def _centroids(rects):
+    c = {}
+    for r in rects:
+        a = r["w"] * r["h"]
+        k = c.setdefault(r["t"], [0, 0, 0])
+        k[0] += (r["x"] + r["w"] / 2) * a; k[1] += (r["y"] + r["h"] / 2) * a; k[2] += a
+    return {t: (v[0] / v[2], v[1] / v[2]) for t, v in c.items()}
+
+
+def score_like_app(mine, plan):
+    """logic.js compareLayout과 같은 계산 (예시 배치를 고를 때만 쓴다)."""
+    a, b = _raster(mine), _raster(plan["rects"])
+    same = sum(1 for x, y in zip(a, b) if x and x == y)
+    union = sum(1 for x, y in zip(a, b) if x or y)
+    overlap = same / union if union else 0
+    ca, cb = _centroids(mine), _centroids(plan["rects"])
+    place = 0
+    for t in ("living", "kitchen", "room", "bath", "entry"):
+        d = math.hypot(ca[t][0] - cb[t][0], (ca[t][1] - cb[t][1]) * .5) if t in ca and t in cb else 1
+        place += max(0, 1 - d / .45)
+    place /= 5
+    rooms = sum(1 for r in mine if r["t"] == "room"); baths = sum(1 for r in mine if r["t"] == "bath")
+    pen = abs(rooms - plan["rooms"]) * .08 + abs(baths - plan["baths"]) * .05
+    return round(max(0, min(1, .55 * overlap + .45 * place - pen)) * 100)
+
+
+def example_from_plan(plan, rooms, baths, cols, rows):
+    rects = plan["rects"]
+    rm = [r for r in rects if r["t"] == "room"]
+    master = next((r for r in rm if r.get("n") == "안방"), None) or max(rm, key=lambda r: r["w"] * r["h"])
+    others = sorted([r for r in rm if r is not master], key=lambda r: -r["w"] * r["h"])
+    assign = {"room1": master}
+    for i, r in enumerate(others[:rooms - 1]):
+        assign[f"room{i + 2}"] = r
+    bs = [r for r in rects if r["t"] == "bath"]
+    if baths == 2 and len(bs) >= 2:
+        mc = (master["x"] + master["w"] / 2, master["y"] + master["h"] / 2)
+        bs = sorted(bs, key=lambda r: math.hypot(r["x"] + r["w"] / 2 - mc[0], r["y"] + r["h"] / 2 - mc[1]))
+        assign["bath2"], assign["bath1"] = bs[0], bs[1]
+    elif bs:
+        assign["bath1"] = bs[0]
+    for t in ("living", "kitchen", "entry"):
+        r = next((r for r in rects if r["t"] == t), None)
+        if r:
+            assign[t] = r
+    placed = {}
+    order = ["living", "room1", "room2", "room3", "room4", "kitchen", "bath2", "bath1", "entry"]
+
+    def hit(x, y, w, h):
+        return any(x < X + W and X < x + w and y < Y + H and Y < y + h for X, Y, W, H in placed.values())
+    for pid in order:
+        r = assign.get(pid)
+        if not r:
+            continue
+        x, y = round(r["x"] * cols), round(r["y"] * rows)
+        w, h = max(2, round(r["w"] * cols)), max(2, round(r["h"] * rows))
+        x, y = min(max(0, x), cols - 2), min(max(0, y), rows - 2)
+        w, h = min(w, cols - x), min(h, rows - y)
+        # 다른 조각과 겹치면 겹친 쪽을 한 칸씩 깎는다 (최소 2칸)
+        tries = 0
+        while hit(x, y, w, h) and tries < 20:
+            if w >= h and w > 2: w -= 1
+            elif h > 2: h -= 1
+            elif w > 2: w -= 1
+            else: break
+            tries += 1
+        if hit(x, y, w, h):
+            continue
+        placed[pid] = [x, y, w, h]
+    # 거실은 남쪽 외벽에 닿게: 아래가 비어 있으면 끝까지 늘린다
+    if "living" in placed:
+        x, y, w, h = placed.pop("living")
+        while y + h < rows and not hit(x, y, w, h + 1):
+            h += 1
+        placed["living"] = [x, y, w, h]
+    return placed
+
+
+def build_example(plans, rooms, baths, cols, rows):
+    best = None
+    for p in plans:
+        if not p.get("daejeon") or p["rooms"] != rooms or p["baths"] != baths:
+            continue
+        lay = example_from_plan(p, rooms, baths, cols, rows)
+        cat = lambda k: "room" if k.startswith("room") else "bath" if k.startswith("bath") else k
+        mine = [{"t": cat(k), "x": x / cols, "y": y / rows, "w": w / cols, "h": h / rows} for k, (x, y, w, h) in lay.items()]
+        expected = len(["living", "kitchen", "entry"]) + rooms + baths
+        sc = score_like_app(mine, p)
+        # 모든 조각이 들어가고 거실이 남쪽에 닿는 도면만 예시로 쓴다
+        if len(lay) < expected or "living" not in lay or sum(lay["living"][1::2]) != rows:
+            continue
+        # 방·거실·주방이 1.5m(3칸)보다 좁으면 예시로 어색하다
+        if any(min(v[2], v[3]) < 3 for k, v in lay.items() if not k.startswith("bath") and k != "entry"):
+            continue
+        if not best or sc > best[0]:
+            best = (sc, p, lay)
+    if not best:
+        return None
+    sc, p, lay = best
+    return {"ref": p["id"], "refName": f"{p['apt']} {p['type']}", "score": sc, "pieces": lay}
+
+
 def build_guide(plans):
     items = []
     for (rooms, baths), (area, label, note) in RECO.items():
@@ -421,8 +540,10 @@ def build_guide(plans):
             else: p[1] += 1
             g += 1
         pieces = fit_to_box(pieces, rooms, cols, rows_)
+        item_example = build_example(plans, rooms, baths, cols, rows_)
         items.append({"rooms": rooms, "baths": baths, "area": area, "label": label, "note": note,
                       "box": [cols * CELL, rows_ * CELL],
+                      **({"example": item_example} if item_example else {}),
                       "pieces": {k: [w * CELL, h * CELL] for k, (w, h) in pieces.items()},
                       "source": "전용면적 대비 공간 비율 예시(거실 24%·주방 12%·안방 15% 등). LH 주택 평면도(공공데이터포털) 26장·대전 단지 평면도 23장과 비율 대조"})
     return {"note": "크기는 [가로m, 세로m], 0.5m 단위. box는 집 테두리 크기", "lhShares": lh_shares(plans), "items": items}

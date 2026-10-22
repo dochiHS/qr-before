@@ -704,10 +704,20 @@
     };
     var masterBath = get("bath2");
     var master = get("room1");
+    var example = state.guide && state.guide.example;
     state.pieces.forEach(function (piece) { piece.x = null; piece.y = null; piece.w = piece.w0; piece.h = piece.h0; });
-    row(state.rooms >= 4 ? ["room3", "room2", "living", "room1"] : ["room2", "living", "room1"], true);
-    row([state.rooms >= 4 ? "room4" : "room3", "bath1", "entry", "kitchen"], false);
-    if (masterBath && master) {
+    if (example && example.pieces) {
+      // 같은 방·욕실 구성의 실제 대전 단지 도면을 집 격자에 옮긴 예시 (build-data.py가 만든 칸 좌표)
+      state.pieces.forEach(function (piece) {
+        var p = example.pieces[piece.id];
+        if (!Array.isArray(p) || p.length < 4) return;
+        piece.x = p[0]; piece.y = p[1]; piece.w = p[2]; piece.h = p[3];
+      });
+    } else {
+      row(state.rooms >= 4 ? ["room3", "room2", "living", "room1"] : ["room2", "living", "room1"], true);
+      row([state.rooms >= 4 ? "room4" : "room3", "bath1", "entry", "kitchen"], false);
+    }
+    if (!example && masterBath && master) {
       masterBath.x = state.cols - masterBath.w;
       masterBath.y = master.y - masterBath.h;
     }
@@ -733,7 +743,7 @@
     state.group = [];
     renderPieceList();
     drawBoard();
-    selectionStatus.textContent = state.baths === 2 ? "안방 욕실은 안방 옆에, 공용 욕실은 복도 쪽에 둔 예시 배치예요." : "공용 욕실을 복도 쪽에 둔 예시 배치예요.";
+    selectionStatus.textContent = example && example.refName ? "실제 대전 아파트(" + example.refName + ") 구조를 본뜬 예시 배치예요. 조각을 옮겨 내 집으로 바꿔 보세요." : state.baths === 2 ? "안방 욕실은 안방 옆에, 공용 욕실은 복도 쪽에 둔 예시 배치예요." : "공용 욕실을 복도 쪽에 둔 예시 배치예요.";
   }
 
   function addCheck(message, status) {
